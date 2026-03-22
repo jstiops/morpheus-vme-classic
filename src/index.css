@@ -1,0 +1,493 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Custom Properties (HPE Design Tokens) ─────────────────────────────── */
+:root {
+  --hpe-green: #00B388;
+  --hpe-green-dark: #00956F;
+  --hpe-green-light: #17EBA0;
+
+  /* Navigation */
+  --nav-height: 40px;
+  --sidebar-width: 280px;
+  --sidebar-collapsed-width: 0px;
+
+  /* Scrollbar */
+  --scrollbar-width: 6px;
+  --scrollbar-thumb: #2A3450;
+  --scrollbar-track: transparent;
+}
+
+/* ─── Global Reset ───────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #0F1419;
+  color: #E8ECEF;
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Scrollbar Styling ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: var(--scrollbar-width);
+  height: var(--scrollbar-width);
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3A4560;
+}
+
+/* ─── Typography ─────────────────────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Layout Primitives ──────────────────────────────────────────────────────── */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.main-content {
+  flex: 1;
+  overflow: auto;
+  background: #0F1419;
+}
+
+/* ─── Sidebar Tree ───────────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  background: #0D1117;
+  border-right: 1px solid #1E2A45;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.2s ease, min-width 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  border-right: none;
+}
+
+/* ─── Topbar ─────────────────────────────────────────────────────────────────── */
+.topbar {
+  height: var(--nav-height);
+  min-height: var(--nav-height);
+  background: #0A0E1A;
+  border-bottom: 1px solid #1A2240;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 12px;
+  z-index: 50;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+/* ─── Data Tables ────────────────────────────────────────────────────────────── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 500;
+  color: #8B9AB0;
+  background: #141C2E;
+  border-bottom: 1px solid #1E2A45;
+  white-space: nowrap;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table th.sortable:hover {
+  color: #E8ECEF;
+  cursor: pointer;
+}
+
+.data-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid #141C2E;
+  color: #D4D9E3;
+  vertical-align: middle;
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.data-table tr:hover td {
+  background: #161D2E;
+}
+
+.data-table tr.selected td {
+  background: #1A2540;
+}
+
+/* ─── Tabs ───────────────────────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  background: #0D1117;
+  border-bottom: 1px solid #1E2A45;
+  padding: 0 16px;
+}
+
+.tab-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #8B9AB0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.tab-item:hover {
+  color: #E8ECEF;
+}
+
+.tab-item.active {
+  color: #00B388;
+  border-bottom-color: #00B388;
+}
+
+/* ─── Cards ──────────────────────────────────────────────────────────────────── */
+.card {
+  background: #141C2E;
+  border: 1px solid #1E2A45;
+  border-radius: 6px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #566278;
+  margin-bottom: 12px;
+}
+
+/* ─── Status Dot ─────────────────────────────────────────────────────────────── */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot.running  { background: #00B388; box-shadow: 0 0 6px rgba(0,179,136,0.5); }
+.status-dot.stopped  { background: #6B7280; }
+.status-dot.suspended{ background: #F59E0B; }
+.status-dot.failed   { background: #EF4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+.status-dot.warning  { background: #F59E0B; }
+.status-dot.provisioning { background: #3B82F6; animation: pulse 1.5s ease-in-out infinite; }
+
+/* ─── Toolbar ────────────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: #141C2E;
+  border-bottom: 1px solid #1E2A45;
+  flex-wrap: wrap;
+}
+
+/* ─── HPE Button Variants ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  white-space: nowrap;
+  user-select: none;
+  line-height: 1.4;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #00B388;
+  color: #000;
+  border-color: #00B388;
+}
+.btn-primary:hover:not(:disabled) {
+  background: #00956F;
+  border-color: #00956F;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: #C0C8D8;
+  border-color: #2A3450;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #1A2035;
+  border-color: #3A4560;
+  color: #E8ECEF;
+}
+
+.btn-danger {
+  background: transparent;
+  color: #EF4444;
+  border-color: #EF4444;
+}
+.btn-danger:hover:not(:disabled) {
+  background: rgba(239,68,68,0.1);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: #8B9AB0;
+  border-color: transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: #161D2E;
+  color: #E8ECEF;
+}
+
+/* ─── Inputs ─────────────────────────────────────────────────────────────────── */
+.input {
+  background: #141C2E;
+  border: 1px solid #2A3450;
+  border-radius: 4px;
+  color: #E8ECEF;
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+}
+
+.input:focus {
+  border-color: #00B388;
+}
+
+.input::placeholder {
+  color: #566278;
+}
+
+.input-search {
+  background: #141C2E;
+  border: 1px solid #2A3450;
+  border-radius: 20px;
+  color: #E8ECEF;
+  padding: 5px 14px 5px 34px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  width: 320px;
+}
+
+.input-search:focus {
+  border-color: #00B388;
+  background: #161D2E;
+}
+
+.input-search::placeholder {
+  color: #566278;
+}
+
+/* ─── Progress Bars ──────────────────────────────────────────────────────────── */
+.progress-bar {
+  height: 4px;
+  background: #1E2A45;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.progress-fill.green  { background: #00B388; }
+.progress-fill.yellow { background: #F59E0B; }
+.progress-fill.red    { background: #EF4444; }
+
+/* ─── Tree Node ──────────────────────────────────────────────────────────────── */
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: #8B9AB0;
+  font-size: 12px;
+  border-radius: 3px;
+  transition: background 0.1s, color 0.1s;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.tree-node:hover {
+  background: #161D2E;
+  color: #C8D4E4;
+}
+
+.tree-node.selected {
+  background: #1A2540;
+  color: #E8ECEF;
+}
+
+/* ─── Modal Overlay ──────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.modal-box {
+  background: #141C2E;
+  border: 1px solid #2A3450;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideIn 0.2s ease-out;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ─── Context Menu ───────────────────────────────────────────────────────────── */
+.context-menu {
+  position: fixed;
+  background: #141C2E;
+  border: 1px solid #2A3450;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+  z-index: 2000;
+  min-width: 180px;
+  animation: fadeIn 0.1s ease-out;
+  overflow: hidden;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: #C0C8D8;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.context-menu-item:hover {
+  background: #1A2540;
+  color: #E8ECEF;
+}
+
+.context-menu-item.danger {
+  color: #EF4444;
+}
+
+.context-menu-item.danger:hover {
+  background: rgba(239,68,68,0.1);
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: #1E2A45;
+  margin: 4px 0;
+}
+
+/* ─── Recharts Overrides ─────────────────────────────────────────────────────── */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #1A2035 !important;
+  border: 1px solid #2A3450 !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  color: #E8ECEF !important;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke: #1E2A45 !important;
+}
+
+.recharts-text {
+  fill: #566278 !important;
+  font-size: 11px !important;
+}
+
+/* ─── Empty State ────────────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 32px;
+  color: #566278;
+  text-align: center;
+  gap: 12px;
+}
