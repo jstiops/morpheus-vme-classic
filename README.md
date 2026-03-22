@@ -36,30 +36,6 @@ for managing HPE Morpheus VM Essentials environments — without learning a new 
 
 ---
 
-## Screenshots
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ H VME Classic │   🔍 Search inventory…   │ [+ New VM] [🔔] [User ▾] │ ← Dark navy topbar
-├──────────┬──────────────────────────────────────────────────────────┤
-│ ≡ Nav    │ Virtual Machines                    [▶ On][■ Off][↺][⏸] │
-│  Dashboard│ ┌───────────────────────────────────────────────────────┐│
-│  VMs ●  │ │ ☑ │ Name         │ Status   │ Cloud  │ IP   │ CPU │Mem ││
-│  Hosts  │ │───┼──────────────┼──────────┼────────┼──────┼─────┼────││
-│  Clusters│ │ ☐ │ web-prod-01  │ ● Running│ DC-Prod│10.0.1│▓▓░░│2.1G││
-│  Networks│ │ ☑ │ db-server-02 │ ● Running│ DC-Prod│10.0.2│▓░░░│8.3G││
-│  Storage│ │ ☐ │ test-vm-99   │ ○ Stopped│ DC-Dev │ —    │ — │ — ││
-│─────────│ └───────────────────────────────────────────────────────────┘│
-│▼ DCs    │                                                              │
-│  ▶ prod │                                                              │
-│    ▶ web│                                                              │
-│    ▼ vms│                                                              │
-│      ●01│                                                              │
-└──────────┴──────────────────────────────────────────────────────────┘
-```
-
----
-
 ## Tech Stack
 
 | Layer | Choice | Rationale |
@@ -72,7 +48,6 @@ for managing HPE Morpheus VM Essentials environments — without learning a new 
 | API/Cache | **TanStack Query v5** | Server state, caching, background refresh |
 | Tables | **TanStack Table v8** | Headless, fully customisable sortable tables |
 | Charts | **Recharts** | React-native, composable area/line charts |
-| Forms | Native React state (wizard) | No overhead for simple 4-step wizard |
 | Routing | **React Router v6** | Nested layouts, search-param tabs |
 | Icons | **Lucide React** | Crisp, consistent, tree-shakeable |
 | HTTP | **Axios** | Interceptors for auth + silent refresh |
@@ -81,55 +56,22 @@ for managing HPE Morpheus VM Essentials environments — without learning a new 
 
 ---
 
-## Quick Start (Development)
-
-```bash
-# 1. Clone
-git clone https://github.com/YOUR_ORG/morpheus-vme-classic.git
-cd morpheus-vme-classic
-
-# 2. Install dependencies
-npm install
-
-# 3. Configure proxy (optional — defaults to localhost:8080)
-cp .env.example .env
-# Edit .env and set VME_URL=https://your-morpheus-manager.example.com
-
-# 4. Start dev server (with API proxy)
-npm run dev
-# → http://localhost:3000
-```
-
-The Vite dev server proxies `/api/*` and `/oauth/*` to your VME Manager so you
-never need CORS headers in development.
-
----
-
 ## Production Deployment on Ubuntu 24.04
 
-### One-shot deploy
-
 ```bash
-# On your Ubuntu 24.04 VM
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/morpheus-vme-classic/main/deploy.sh)"
-```
-
-Or clone manually first:
-
-```bash
-git clone https://github.com/YOUR_ORG/morpheus-vme-classic.git
+git clone https://github.com/jstiops/morpheus-vme-classic.git
 cd morpheus-vme-classic
 sudo bash deploy.sh
 ```
 
-**The script will:**
+**`deploy.sh` will:**
 
-1. Install Node.js 20 LTS (via NodeSource) and Nginx
-2. Prompt once for your VME Manager URL
-3. Run `npm ci && npm run build`
-4. Copy `dist/` → `/var/www/morpheus-vme-classic/dist/`
-5. Write the Nginx site config (reverse proxy `/api/*` → VME)
-6. Configure `ufw` (HTTP + SSH)
+1. Install Node.js 20 LTS (via NodeSource) and Nginx if not already present
+2. Prompt once for your VME Manager URL (e.g. `https://morpheus.example.com`)
+3. Run `npm ci && npm run build` to produce the static bundle
+4. Copy `dist/` to `/var/www/morpheus-vme-classic/dist/`
+5. Write the Nginx site config — reverse proxies `/api/*` and `/oauth/*` to the VME Manager URL, serves the SPA with a fallback to `index.html`
+6. Enable `ufw` firewall rules for HTTP and SSH
 7. Reload Nginx
 
 After ~2 minutes you'll see:
@@ -141,15 +83,7 @@ After ~2 minutes you'll see:
   VME Proxy:   http://10.0.0.50/api/ → https://your-morpheus.example.com/api/
 ```
 
-### Manual Build
-
-```bash
-npm ci
-npm run build        # Output: dist/
-```
-
-Place the `dist/` contents behind any static web server that can proxy
-`/api/*` and `/oauth/*` to your VME Manager URL.
+Open a browser, navigate to the server IP, and sign in with your Morpheus username and password.
 
 ---
 
@@ -196,64 +130,6 @@ Tokens are stored in `sessionStorage` by default, or `localStorage` when
 
 ---
 
-## Project Structure
-
-```
-morpheus-vme-classic/
-├── src/
-│   ├── api/                # Axios client + per-resource fetch functions
-│   │   ├── client.ts       # Axios instance, interceptors, token storage
-│   │   ├── auth.ts         # login(), fetchCurrentUser()
-│   │   ├── instances.ts    # VMs: list, get, power, snapshots, history
-│   │   ├── servers.ts      # Hosts
-│   │   └── clouds.ts       # Zones, networks, storage, plans, layouts
-│   ├── types/
-│   │   └── morpheus.ts     # Full TypeScript types for Morpheus entities
-│   ├── store/
-│   │   ├── authStore.ts    # Zustand: user + auth state
-│   │   ├── treeStore.ts    # Zustand: sidebar tree expand/select state
-│   │   └── uiStore.ts      # Zustand: global search, modals, context menu
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── AppLayout.tsx    # Root layout: topbar + sidebar + outlet
-│   │   │   ├── TopBar.tsx       # Dark nav bar with search + user menu
-│   │   │   └── Sidebar.tsx      # Collapsible inventory tree
-│   │   └── common/
-│   │       ├── LoadingSpinner   # Animated SVG spinner + PageLoader
-│   │       ├── StatusDot        # Status indicator dot + badge
-│   │       ├── Modal            # Reusable modal with header/body/footer
-│   │       ├── ContextMenu      # Right-click context menu for VMs
-│   │       └── Sparkline        # Mini Recharts sparkline chart
-│   ├── features/
-│   │   ├── auth/           # LoginPage, ProtectedRoute
-│   │   ├── dashboard/      # DashboardPage — summary cards + tables
-│   │   ├── vms/
-│   │   │   ├── VMListPage.tsx    # Full VM table with bulk actions
-│   │   │   ├── VMDetailPage.tsx  # Tabbed VM detail view
-│   │   │   ├── VMCreateWizard.tsx# 4-step create wizard
-│   │   │   └── tabs/
-│   │   │       ├── SummaryTab    # Info cards + resource gauges
-│   │   │       ├── MonitorTab    # CPU/Mem/Net area charts
-│   │   │       ├── SnapshotsTab  # Snapshot list + create/revert/delete
-│   │   │       └── TasksTab      # Process history table
-│   │   ├── hosts/          # HostsPage — read-only hypervisor list
-│   │   ├── clusters/       # ClustersPage — read-only cluster list
-│   │   ├── networks/       # NetworksPage — read-only network list
-│   │   └── storage/        # StoragePage — read-only datastore list
-│   └── utils/
-│       └── format.ts       # formatBytes, formatPercent, formatDuration
-├── nginx/
-│   └── morpheus-vme.conf   # Nginx site template
-├── scripts/
-│   └── generate-api.sh     # Auto-generate client from Morpheus OpenAPI spec
-├── deploy.sh               # Ubuntu 24.04 one-shot deploy script
-├── vite.config.ts
-├── tailwind.config.ts
-└── .env.example
-```
-
----
-
 ## Generating the OpenAPI Client
 
 The official Morpheus OpenAPI spec is at:
@@ -270,29 +146,11 @@ features.
 
 ---
 
-## Customisation
-
-### Change accent colour
-Edit `tailwind.config.ts` → `theme.extend.colors.hpe.green` and update
-`--hpe-green` in `src/index.css`.
-
-### Add a new page
-1. Create `src/features/my-feature/MyPage.tsx`
-2. Add a `<Route>` in `src/App.tsx`
-3. Add a nav item in `src/components/layout/Sidebar.tsx`
-
-### Add API endpoint
-Add a function to the appropriate file in `src/api/` using `apiClient` from
-`src/api/client.ts`. The bearer token is automatically attached.
-
----
-
 ## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `VME_URL` | Prod only | VME Manager base URL — used by `deploy.sh` for Nginx proxy config |
-| `VITE_API_BASE_URL` | Dev only | Override the Vite proxy target (defaults to `http://localhost:8080`) |
 
 ---
 
