@@ -66,24 +66,26 @@ sudo bash deploy.sh
 
 **`deploy.sh` will:**
 
-1. Install Node.js 20 LTS (via NodeSource) and Nginx if not already present
+1. Install Node.js 20 LTS (via NodeSource), Nginx, and OpenSSL if not already present
 2. Prompt once for your VME Manager URL (e.g. `https://morpheus.example.com`)
-3. Run `npm ci && npm run build` to produce the static bundle
-4. Copy `dist/` to `/var/www/morpheus-vme-classic/dist/`
-5. Write the Nginx site config — reverse proxies `/api/*` and `/oauth/*` to the VME Manager URL, serves the SPA with a fallback to `index.html`
-6. Enable `ufw` firewall rules for HTTP and SSH
-7. Reload Nginx
+3. Generate a self-signed TLS certificate (RSA 2048, 10-year validity) stored at `/etc/ssl/morpheus-vme/`
+4. Run `npm ci && npm run build` to produce the static bundle
+5. Copy `dist/` to `/var/www/morpheus-vme-classic/dist/`
+6. Write the Nginx site config — listens on **HTTPS port 443 only**, reverse proxies `/api/*` and `/oauth/*` to the VME Manager URL, serves the SPA with a fallback to `index.html`
+7. Enable `ufw` firewall rules for HTTPS and SSH — port 80 is not opened
+8. Reload Nginx
 
 After ~2 minutes you'll see:
 
 ```
 ✅ HPE Morpheus VME Classic deployed successfully!
 
-  Dashboard:   http://10.0.0.50/
-  VME Proxy:   http://10.0.0.50/api/ → https://your-morpheus.example.com/api/
+  Dashboard:   https://10.0.0.50/
+  VME Proxy:   https://10.0.0.50/api/ → https://your-morpheus.example.com/api/
+  TLS cert:    /etc/ssl/morpheus-vme/cert.pem
 ```
 
-Open a browser, navigate to the server IP, and sign in with your Morpheus username and password.
+Open a browser and navigate to `https://<server-ip>/`. Your browser will warn about the self-signed certificate — click **Advanced → Proceed**. To suppress the warning permanently, import `/etc/ssl/morpheus-vme/cert.pem` into your OS or browser certificate store.
 
 ---
 
@@ -92,23 +94,31 @@ Open a browser, navigate to the server IP, and sign in with your Morpheus userna
 `nginx/morpheus-vme.conf` is the template deployed by `deploy.sh`. Key rules:
 
 ```nginx
-location /api/ {
-    proxy_pass        https://your-vme-manager.example.com/api/;
-    proxy_set_header  Authorization  $http_authorization;
-    proxy_pass_header Authorization;
-}
+server {
+    listen 443 ssl;
 
-location /oauth/ {
-    proxy_pass        https://your-vme-manager.example.com/oauth/;
-}
+    ssl_certificate     /etc/ssl/morpheus-vme/cert.pem;
+    ssl_certificate_key /etc/ssl/morpheus-vme/key.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
 
-location / {
-    try_files $uri $uri/ /index.html;   # SPA fallback
+    location /api/ {
+        proxy_pass        https://your-vme-manager.example.com/api/;
+        proxy_set_header  Authorization  $http_authorization;
+        proxy_pass_header Authorization;
+    }
+
+    location /oauth/ {
+        proxy_pass        https://your-vme-manager.example.com/oauth/;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;   # SPA fallback
+    }
 }
 ```
 
 The `Authorization: Bearer <token>` header is **transparently forwarded** — Nginx
-never stores or logs credentials.
+never stores or logs credentials. Port 80 is not configured.
 
 ---
 

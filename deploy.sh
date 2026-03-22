@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
 # HPE Morpheus VME Classic — Deploy Script for Ubuntu 24.04
-# Usage:  bash deploy.sh
+# Usage:  sudo bash deploy.sh
 # =============================================================================
 set -euo pipefail
 
 APP_NAME="morpheus-vme-classic"
 APP_DIR="/opt/${APP_NAME}"
 STATIC_DIR="/var/www/${APP_NAME}/dist"
+SSL_DIR="/etc/ssl/morpheus-vme"
 NGINX_CONF="/etc/nginx/sites-available/${APP_NAME}"
 NGINX_ENABLED="/etc/nginx/sites-enabled/${APP_NAME}"
-REPO_URL="https://github.com/YOUR_ORG/${APP_NAME}.git"  # ← edit before running
+REPO_URL="https://github.com/jstiops/morpheus-vme-classic.git"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 GREEN='\033[0;32m'
@@ -40,13 +41,10 @@ echo "╚═══════════════════════�
 print_step "VME Manager Configuration"
 read -rp "  Enter your VME Manager URL (e.g. https://morpheus.example.com): " VME_URL
 
-# Validate URL format
 if [[ ! "$VME_URL" =~ ^https?:// ]]; then
     print_err "URL must start with http:// or https://"
     exit 1
 fi
-
-# Strip trailing slash
 VME_URL="${VME_URL%/}"
 print_ok "VME URL: $VME_URL"
 
@@ -54,7 +52,6 @@ print_ok "VME URL: $VME_URL"
 print_step "Installing system dependencies"
 apt-get update -qq
 
-# Install Nginx
 if ! command -v nginx &>/dev/null; then
     apt-get install -y -qq nginx
     print_ok "Nginx installed"
@@ -62,7 +59,13 @@ else
     print_ok "Nginx already installed"
 fi
 
-# Install Node.js 20 LTS
+if ! command -v openssl &>/dev/null; then
+    apt-get install -y -qq openssl
+    print_ok "openssl installed"
+else
+    print_ok "openssl already installed"
+fi
+
 if ! command -v node &>/dev/null || [[ $(node -v | cut -d. -f1 | tr -d v) -lt 18 ]]; then
     print_warn "Installing Node.js 20 LTS via NodeSource…"
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
@@ -72,18 +75,35 @@ else
     print_ok "Node.js $(node -v) already installed"
 fi
 
-# Install git
 if ! command -v git &>/dev/null; then
     apt-get install -y -qq git
     print_ok "git installed"
 fi
 
-# Install ufw if not present
 if ! command -v ufw &>/dev/null; then
     apt-get install -y -qq ufw
 fi
 
-# ── Step 3: Clone / Update repo ───────────────────────────────────────────────
+# ── Step 3: Generate self-signed TLS certificate ──────────────────────────────
+print_step "Generating self-signed TLS certificate (10-year validity)"
+mkdir -p "$SSL_DIR"
+SERVER_IP=$(hostname -I | awk '{print $1}')
+SERVER_HOST=$(hostname -f 2>/dev/null || echo "localhost")
+
+openssl req -x509 -nodes -days 3650 \
+    -newkey rsa:2048 \
+    -keyout "${SSL_DIR}/key.pem" \
+    -out    "${SSL_DIR}/cert.pem" \
+    -subj   "/C=US/O=HPE Morpheus VME Classic/CN=${SERVER_HOST}" \
+    -addext "subjectAltName=IP:${SERVER_IP},DNS:${SERVER_HOST},DNS:localhost" \
+    2>/dev/null
+
+chmod 600 "${SSL_DIR}/key.pem"
+chmod 644 "${SSL_DIR}/cert.pem"
+print_ok "Certificate: ${SSL_DIR}/cert.pem  (CN=${SERVER_HOST}, SAN=IP:${SERVER_IP})"
+print_ok "Private key: ${SSL_DIR}/key.pem"
+
+# ── Step 4: Clone / Update repo ───────────────────────────────────────────────
 print_step "Fetching application source"
 if [[ -d "$APP_DIR/.git" ]]; then
     print_warn "Repo exists — pulling latest…"
@@ -93,64 +113,65 @@ else
 fi
 print_ok "Source at $APP_DIR"
 
-# ── Step 4: Install npm dependencies ─────────────────────────────────────────
+# ── Step 5: Install npm dependencies ─────────────────────────────────────────
 print_step "Installing npm dependencies"
 cd "$APP_DIR"
 npm ci --prefer-offline --silent
 print_ok "Dependencies installed"
 
-# ── Step 5: Build ─────────────────────────────────────────────────────────────
+# ── Step 6: Build ─────────────────────────────────────────────────────────────
 print_step "Building production bundle"
 npm run build
 print_ok "Build complete"
 
-# ── Step 6: Deploy static files ──────────────────────────────────────────────
+# ── Step 7: Deploy static files ──────────────────────────────────────────────
 print_step "Deploying static files"
 mkdir -p "$STATIC_DIR"
 rsync -a --delete "$APP_DIR/dist/" "$STATIC_DIR/"
 chown -R www-data:www-data "/var/www/${APP_NAME}"
 print_ok "Static files deployed to $STATIC_DIR"
 
-# ── Step 7: Configure Nginx ───────────────────────────────────────────────────
+# ── Step 8: Configure Nginx ───────────────────────────────────────────────────
 print_step "Configuring Nginx"
 cp "$APP_DIR/nginx/morpheus-vme.conf" "$NGINX_CONF"
-# Substitute the real VME URL
 sed -i "s|VME_MANAGER_URL_PLACEHOLDER|${VME_URL}|g" "$NGINX_CONF"
 
-# Enable site, remove default if present
 ln -sf "$NGINX_CONF" "$NGINX_ENABLED"
 rm -f /etc/nginx/sites-enabled/default
 
-# Test config
 nginx -t
 print_ok "Nginx config valid"
 
-# ── Step 8: Firewall ──────────────────────────────────────────────────────────
-print_step "Configuring firewall"
+# ── Step 9: Firewall ──────────────────────────────────────────────────────────
+print_step "Configuring firewall (HTTPS + SSH only)"
 ufw --force enable >/dev/null
-ufw allow 'Nginx HTTP' >/dev/null
+ufw allow 'Nginx HTTPS' >/dev/null
 ufw allow OpenSSH >/dev/null
-print_ok "ufw: HTTP + SSH allowed"
+ufw delete allow 'Nginx HTTP' >/dev/null 2>&1 || true
+ufw delete allow 80/tcp    >/dev/null 2>&1 || true
+print_ok "ufw: HTTPS (443) + SSH allowed — port 80 blocked"
 
-# ── Step 9: Reload services ───────────────────────────────────────────────────
+# ── Step 10: Reload services ──────────────────────────────────────────────────
 print_step "Starting / reloading services"
 systemctl enable nginx
 systemctl reload nginx || systemctl start nginx
 print_ok "Nginx running"
 
 # ── Done ──────────────────────────────────────────────────────────────────────
-SERVER_IP=$(hostname -I | awk '{print $1}')
-
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗"
 echo -e "║  ✅  HPE Morpheus VME Classic deployed successfully!          ║"
 echo -e "╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  ${CYAN}Dashboard:${NC}   http://${SERVER_IP}/"
-echo -e "  ${CYAN}VME Proxy:${NC}   http://${SERVER_IP}/api/ → ${VME_URL}/api/"
-echo -e "  ${CYAN}Static dir:${NC}  ${STATIC_DIR}"
-echo -e "  ${CYAN}Nginx conf:${NC}  ${NGINX_CONF}"
+echo -e "  ${CYAN}Dashboard:${NC}   https://${SERVER_IP}/"
+echo -e "  ${CYAN}VME Proxy:${NC}   https://${SERVER_IP}/api/ → ${VME_URL}/api/"
+echo -e "  ${CYAN}TLS cert:${NC}    ${SSL_DIR}/cert.pem"
 echo ""
-echo "  Open a browser and navigate to http://${SERVER_IP}/"
+echo "  ⚠  The certificate is self-signed. Browsers will show a security"
+echo "     warning — click 'Advanced → Proceed' to continue."
+echo "     To trust it system-wide, import ${SSL_DIR}/cert.pem into your"
+echo "     browser or OS certificate store."
+echo ""
+echo "  Open a browser and navigate to https://${SERVER_IP}/"
 echo "  Sign in with your Morpheus username and password."
 echo ""
