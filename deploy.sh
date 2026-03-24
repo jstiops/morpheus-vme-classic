@@ -116,7 +116,7 @@ print_ok "Source at $APP_DIR"
 # ── Step 5: Install npm dependencies ─────────────────────────────────────────
 print_step "Installing npm dependencies (this may take a few minutes)"
 cd "$APP_DIR"
-npm ci --no-audit --no-fund
+npm install --no-audit --no-fund
 print_ok "Dependencies installed"
 
 # ── Step 6: Build ─────────────────────────────────────────────────────────────

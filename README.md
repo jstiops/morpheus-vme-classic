@@ -97,7 +97,7 @@ To apply a new version of the application on an already-deployed server:
 ```bash
 cd /opt/morpheus-vme-classic
 sudo git pull
-sudo npm ci --prefer-offline --silent
+sudo npm install --no-audit --no-fund
 sudo npm run build
 sudo rsync -a --delete dist/ /var/www/morpheus-vme-classic/dist/
 sudo nginx -s reload
