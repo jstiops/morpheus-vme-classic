@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -15,7 +16,7 @@ import { getInstance, startInstance, stopInstance, restartInstance, suspendInsta
 import { StatusBadge } from '@/components/common/StatusDot'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { SummaryTab } from './tabs/SummaryTab'
-import { MonitorTab } from './tabs/MonitorTab'
+const MonitorTab = lazy(() => import('./tabs/MonitorTab').then(m => ({ default: m.MonitorTab })))
 import { SnapshotsTab } from './tabs/SnapshotsTab'
 import { TasksTab } from './tabs/TasksTab'
 import toast from 'react-hot-toast'
@@ -199,7 +200,11 @@ export function VMDetailPage() {
       {/* Tab Content */}
       <div className="flex-1 overflow-auto p-4">
         {activeTab === 'summary' && <SummaryTab instance={instance} />}
-        {activeTab === 'monitor' && <MonitorTab instanceId={instanceId} />}
+        {activeTab === 'monitor' && (
+          <Suspense fallback={<PageLoader />}>
+            <MonitorTab instanceId={instanceId} />
+          </Suspense>
+        )}
         {activeTab === 'configure' && (
           <ConfigureTab instance={instance} />
         )}
