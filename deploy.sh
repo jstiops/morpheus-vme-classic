@@ -114,14 +114,14 @@ fi
 print_ok "Source at $APP_DIR"
 
 # ── Step 5: Install npm dependencies ─────────────────────────────────────────
-print_step "Installing npm dependencies"
+print_step "Installing npm dependencies (this may take a few minutes)"
 cd "$APP_DIR"
-npm ci --prefer-offline --silent
+npm ci --no-audit --no-fund
 print_ok "Dependencies installed"
 
 # ── Step 6: Build ─────────────────────────────────────────────────────────────
-print_step "Building production bundle"
-npm run build
+print_step "Building production bundle (this may take a minute)"
+npm run build 2>&1
 print_ok "Build complete"
 
 # ── Step 7: Deploy static files ──────────────────────────────────────────────
