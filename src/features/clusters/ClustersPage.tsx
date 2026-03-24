@@ -16,13 +16,11 @@ export function ClustersPage() {
     retry: 0,
   })
 
-  const clusters = (data?.clusters ?? [])
-    .filter((c) => c.layout?.provisionTypeCode === 'morpheus')
-    .filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()))
+  const clusters = (data?.clusters ?? []).filter(
+    (c) => !search || c.name.toLowerCase().includes(search.toLowerCase()),
+  )
 
-  const total = (data?.clusters ?? []).filter(
-    (c) => c.layout?.provisionTypeCode === 'morpheus',
-  ).length
+  const total = data?.clusters?.length ?? 0
 
   if (isLoading) return <PageLoader />
 
@@ -35,7 +33,7 @@ export function ClustersPage() {
         <div>
           <h1 className="text-base font-semibold text-white">Clusters</h1>
           <p className="text-xs mt-0.5" style={{ color: '#566278' }}>
-            {total} Morpheus clusters
+            {total} clusters
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -59,7 +57,7 @@ export function ClustersPage() {
         {clusters.length === 0 ? (
           <div className="empty-state">
             <Layers size={32} style={{ color: '#566278' }} />
-            <p className="text-sm font-medium" style={{ color: '#8B9AB0' }}>No Morpheus clusters found</p>
+            <p className="text-sm font-medium" style={{ color: '#8B9AB0' }}>No clusters found</p>
           </div>
         ) : (
           <table className="data-table">
