@@ -34,7 +34,6 @@ import {
   suspendInstance,
 } from '@/api/instances'
 import { StatusBadge } from '@/components/common/StatusDot'
-import { Sparkline } from '@/components/common/Sparkline'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { useUiStore } from '@/store/uiStore'
 import { useTreeStore } from '@/store/treeStore'
@@ -211,19 +210,6 @@ export function VMListPage() {
           )
         },
         size: 170,
-      }),
-      col.display({
-        id: 'sparkline',
-        header: 'CPU (trend)',
-        cell: ({ row }) => {
-          // Generate mock sparkline from current value for demonstration
-          const base = row.original.stats?.cpuUsage ?? 0
-          const pts = Array.from({ length: 12 }, (_) =>
-            Math.max(0, Math.min(100, base + (Math.random() - 0.5) * 20)),
-          )
-          return <Sparkline data={pts} />
-        },
-        size: 100,
       }),
       col.accessor('dateCreated', {
         header: 'Created',

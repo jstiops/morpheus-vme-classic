@@ -13,6 +13,17 @@ export function HostsPage() {
     queryKey: ['servers'],
     queryFn: () => listServers({ max: 50 }),
     staleTime: 60_000,
+    select: (d) => ({
+      ...d,
+      servers: d.servers.filter(
+        (s) =>
+          s.computeServerType?.nodeType === 'hypervisor' ||
+          s.computeServerType?.code?.includes('hypervisor') ||
+          s.computeServerType?.code === 'vmware-esxi' ||
+          s.computeServerType?.code?.startsWith('esxi') ||
+          s.computeServerType?.code?.startsWith('kvm'),
+      ),
+    }),
   })
 
   const servers = (data?.servers ?? []).filter(

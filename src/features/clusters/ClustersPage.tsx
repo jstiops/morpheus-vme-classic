@@ -13,6 +13,7 @@ export function ClustersPage() {
     queryKey: ['server-groups'],
     queryFn: () => listServerGroups(),
     staleTime: 60_000,
+    retry: 0,
   })
 
   const { data: serversData } = useQuery({
