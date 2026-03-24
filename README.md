@@ -58,9 +58,10 @@ for managing HPE Morpheus VM Essentials environments — without learning a new 
 
 ## Production Deployment on Ubuntu 24.04
 
+Run this on the Ubuntu server — no prior setup needed. The script clones the repo into `/opt/morpheus-vme-classic` itself:
+
 ```bash
-git clone https://github.com/jstiops/morpheus-vme-classic.git
-cd morpheus-vme-classic
+curl -fsSL https://raw.githubusercontent.com/jstiops/morpheus-vme-classic/master/deploy.sh -o deploy.sh
 sudo bash deploy.sh
 ```
 
