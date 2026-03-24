@@ -35,13 +35,13 @@ export function Sidebar() {
   })
 
   const { data: instancesData } = useQuery({
-    queryKey: ['instances', 'sidebar'],
+    queryKey: ['instances'],
     queryFn: () => listInstances({ max: 50 }),
     staleTime: 30_000,
   })
 
   const { data: serversData } = useQuery({
-    queryKey: ['servers', 'sidebar'],
+    queryKey: ['servers'],
     queryFn: () => listServers({ max: 50 }),
     staleTime: 60_000,
   })
