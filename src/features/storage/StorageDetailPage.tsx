@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { listAllDataStores } from '@/api/clouds'
+import { listDataStores } from '@/api/clouds'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { ArrowLeft, HardDrive } from 'lucide-react'
 import { formatBytes } from '@/utils/format'
@@ -13,7 +13,7 @@ export function StorageDetailPage() {
 
   const { data: datastores, isLoading } = useQuery({
     queryKey: ['datastores'],
-    queryFn: () => listAllDataStores(),
+    queryFn: () => listDataStores(),
     staleTime: 120_000,
     retry: 0,
   })
@@ -30,7 +30,7 @@ export function StorageDetailPage() {
   )
 
   const storMax = ds.storageSize ?? 0
-  const storFree = ds.freeSpace ?? ds.freeSize ?? 0
+  const storFree = ds.freeSpace ?? 0
   const storUsed = storMax > 0 ? storMax - storFree : 0
   const storPct = storMax > 0 ? (storUsed / storMax) * 100 : 0
 
@@ -54,9 +54,9 @@ export function StorageDetailPage() {
         <h1 className="text-base font-semibold text-white flex-1 truncate">{ds.name}</h1>
         <span
           className="text-xs"
-          style={{ color: ds.onlineStatus !== false ? '#00B388' : '#EF4444' }}
+          style={{ color: ds.online !== false ? '#00B388' : '#EF4444' }}
         >
-          {ds.onlineStatus !== false ? 'Online' : 'Offline'}
+          {ds.online !== false ? 'Online' : 'Offline'}
         </span>
       </div>
 
@@ -141,7 +141,7 @@ export function StorageDetailPage() {
                 ['Name', ds.name],
                 ['Type', typeLabel],
                 ['Cloud', ds.zone?.name],
-                ['Status', ds.onlineStatus !== false ? 'Online' : 'Offline'],
+                ['Status', ds.online !== false ? 'Online' : 'Offline'],
               ].map(([label, value]) => (
                 <div key={label as string} className="flex gap-2">
                   <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>{label}:</dt>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { listNetworks } from '@/api/clouds'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { Search, RefreshCw, Network, CheckCircle, XCircle } from 'lucide-react'
@@ -7,6 +8,7 @@ import { clsx } from 'clsx'
 
 export function NetworksPage() {
   const [search, setSearch] = useState('')
+  const navigate = useNavigate()
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['networks'],
@@ -75,7 +77,7 @@ export function NetworksPage() {
             </thead>
             <tbody>
               {networks.map((net) => (
-                <tr key={net.id}>
+                <tr key={net.id} className="cursor-pointer" onClick={() => navigate(`/networks/${net.id}`)}>
                   <td>
                     <div className="flex items-center gap-2">
                       <Network size={12} style={{ color: '#60A5FA' }} />

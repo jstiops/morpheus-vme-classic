@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { listAllDataStores } from '@/api/clouds'
+import { listDataStores } from '@/api/clouds'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { formatBytes } from '@/utils/format'
 import { Search, RefreshCw, HardDrive } from 'lucide-react'
 import { clsx } from 'clsx'
 
-const DATASTORE_TYPES = ['directory', 'generic']
+const DATASTORE_TYPES = ['directory', 'localdir', 'generic', 'localgeneric']
 
 function typeLabel(type: string) {
   if (type === 'directory') return 'Directory Pool'
@@ -22,13 +22,13 @@ export function StoragePage() {
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['datastores'],
-    queryFn: () => listAllDataStores(),
+    queryFn: () => listDataStores(),
     staleTime: 120_000,
     retry: 0,
   })
 
   const datastores = (data ?? [])
-    .filter((ds) => DATASTORE_TYPES.includes(ds.type))
+    .filter((ds) => DATASTORE_TYPES.includes((ds.type ?? '').toLowerCase()))
     .filter(
       (ds) =>
         !search ||
@@ -89,7 +89,7 @@ export function StoragePage() {
             <tbody>
               {datastores.map((ds) => {
                 const storMax = ds.storageSize ?? 0
-                const storFree = ds.freeSpace ?? ds.freeSize ?? 0
+                const storFree = ds.freeSpace ?? 0
                 const storUsed = storMax > 0 ? storMax - storFree : 0
                 const pct = storMax > 0 ? (storUsed / storMax) * 100 : 0
 
@@ -134,9 +134,9 @@ export function StoragePage() {
                     <td>
                       <span
                         className="text-xs"
-                        style={{ color: ds.onlineStatus !== false ? '#00B388' : '#EF4444' }}
+                        style={{ color: ds.online !== false ? '#00B388' : '#EF4444' }}
                       >
-                        {ds.onlineStatus !== false ? 'online' : 'offline'}
+                        {ds.online !== false ? 'online' : 'offline'}
                       </span>
                     </td>
                   </tr>

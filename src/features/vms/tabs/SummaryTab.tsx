@@ -5,6 +5,7 @@ import { Server, Cpu, Network, Tag } from 'lucide-react'
 
 interface Props {
   instance: Instance
+  hostName?: string
 }
 
 function InfoCard({
@@ -69,7 +70,7 @@ function ResourceGauge({
   )
 }
 
-export function SummaryTab({ instance }: Props) {
+export function SummaryTab({ instance, hostName }: Props) {
   const container = instance.containers?.[0]
   const stats = instance.stats ?? container?.stats
 
@@ -176,7 +177,7 @@ export function SummaryTab({ instance }: Props) {
           ['Instance ID', instance.id],
           ['Hostname', instance.hostName || container?.hostname || '—'],
           ['IP Address', ip || '—'],
-          ['Host', container?.server?.name ?? '—'],
+          ['Host', hostName ?? '—'],
           ['Cloud', instance.cloud?.name ?? '—'],
           ['Group', instance.group?.name ?? '—'],
           ['Plan', instance.plan?.name ?? '—'],

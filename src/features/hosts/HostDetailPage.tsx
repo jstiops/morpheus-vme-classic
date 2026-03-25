@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getServer, getServerHistory } from '@/api/servers'
+import { listInstances } from '@/api/instances'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusDot'
 import { formatBytes, formatPercent } from '@/utils/format'
@@ -39,6 +40,17 @@ export function HostDetailPage() {
     enabled: !!hostId,
     staleTime: 30_000,
   })
+
+  const { data: instancesData } = useQuery({
+    queryKey: ['instances', { serverId: hostId }],
+    queryFn: () => listInstances({ serverId: hostId, max: 100 }),
+    enabled: !!hostId,
+    staleTime: 30_000,
+  })
+
+  const hostInstances = instancesData?.instances ?? []
+  const runningCount = hostInstances.filter((i) => i.status === 'running').length
+  const totalCount = hostInstances.length
 
   if (isLoading) return <PageLoader />
 
@@ -90,7 +102,7 @@ export function HostDetailPage() {
       {/* Tab Content */}
       <div className="flex-1 overflow-auto p-4">
         {activeTab === 'summary' && (
-          <HostSummaryTab server={server} cpuPct={cpuPct} memUsed={memUsed} memMax={memMax} memPct={memPct} />
+          <HostSummaryTab server={server} cpuPct={cpuPct} memUsed={memUsed} memMax={memMax} memPct={memPct} runningCount={runningCount} totalCount={totalCount} />
         )}
         {activeTab === 'monitor' && (
           <HostMonitorTab server={server} cpuPct={cpuPct} memUsed={memUsed} memMax={memMax} memPct={memPct} />
@@ -107,12 +119,16 @@ function HostSummaryTab({
   memUsed,
   memMax,
   memPct,
+  runningCount,
+  totalCount,
 }: {
   server: Awaited<ReturnType<typeof getServer>>
   cpuPct: number
   memUsed: number
   memMax: number
   memPct: number
+  runningCount: number
+  totalCount: number
 }) {
   return (
     <div className="grid grid-cols-3 gap-4 max-w-5xl">
@@ -216,11 +232,11 @@ function HostSummaryTab({
         <div className="card-title">Virtual Machines</div>
         <div className="flex gap-6 mt-3">
           <div>
-            <div className="text-2xl font-bold" style={{ color: '#00B388' }}>{server.runningCount ?? 0}</div>
+            <div className="text-2xl font-bold" style={{ color: '#00B388' }}>{runningCount}</div>
             <div className="text-xs mt-0.5" style={{ color: '#566278' }}>Running</div>
           </div>
           <div>
-            <div className="text-2xl font-bold" style={{ color: '#8B9AB0' }}>{server.totalCount ?? 0}</div>
+            <div className="text-2xl font-bold" style={{ color: '#8B9AB0' }}>{totalCount}</div>
             <div className="text-xs mt-0.5" style={{ color: '#566278' }}>Total</div>
           </div>
         </div>

@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { getInstance, startInstance, stopInstance, restartInstance, suspendInstance } from '@/api/instances'
+import { listServers } from '@/api/servers'
 import { StatusBadge } from '@/components/common/StatusDot'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { SummaryTab } from './tabs/SummaryTab'
@@ -46,6 +47,17 @@ export function VMDetailPage() {
     staleTime: 15_000,
     enabled: !!instanceId,
   })
+
+  const { data: hypervisorsData } = useQuery({
+    queryKey: ['servers', 'hypervisors'],
+    queryFn: () => listServers({ max: 100, vmHypervisor: true }),
+    staleTime: 60_000,
+  })
+
+  const container = instance?.containers?.[0]
+  const hostName =
+    container?.server?.name ??
+    hypervisorsData?.servers?.find((s) => s.id === container?.server?.id)?.name
 
   const mutation = useMutation({
     mutationFn: async (action: string) => {
@@ -198,7 +210,7 @@ export function VMDetailPage() {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-auto p-4">
-        {activeTab === 'summary' && <SummaryTab instance={instance} />}
+        {activeTab === 'summary' && <SummaryTab instance={instance} hostName={hostName} />}
         {activeTab === 'monitor' && (
           <Suspense fallback={<PageLoader />}>
             <MonitorTab instanceId={instanceId} />

@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listInstances } from '@/api/instances'
 import { listServers } from '@/api/servers'
-import { listClusters, listNetworks, listAllDataStores } from '@/api/clouds'
+import { listClusters, listNetworks, listDataStores } from '@/api/clouds'
 import {
   ChevronRight,
   ChevronDown,
@@ -140,7 +140,7 @@ export function Sidebar() {
   })
   const { data: datastoresData } = useQuery({
     queryKey: ['datastores'],
-    queryFn: () => listAllDataStores(),
+    queryFn: () => listDataStores(),
     staleTime: 120_000,
     retry: 0,
   })
@@ -151,8 +151,9 @@ export function Sidebar() {
   )
   const clusters = clustersData?.clusters ?? []
   const networks = networksData?.networks ?? []
+  const DATASTORE_TYPES = ['directory', 'localdir', 'generic', 'localgeneric']
   const datastores = (datastoresData ?? []).filter(
-    (ds) => ds.type === 'directory' || ds.type === 'generic',
+    (ds) => DATASTORE_TYPES.includes((ds.type ?? '').toLowerCase()),
   )
 
   const p = location.pathname
@@ -267,8 +268,8 @@ export function Sidebar() {
               key={net.id}
               label={net.displayName ?? net.name}
               sub={net.cidr ?? undefined}
-              active={false}
-              onClick={() => navigate('/networks')}
+              active={p === `/networks/${net.id}`}
+              onClick={() => navigate(`/networks/${net.id}`)}
             />
           ))}
         </Section>

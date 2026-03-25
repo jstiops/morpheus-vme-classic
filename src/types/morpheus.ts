@@ -131,6 +131,7 @@ export interface ComputeServer {
   usedStorage?: number
   runningCount?: number
   totalCount?: number
+  containers?: number[]
   dateCreated: string
   lastUpdated: string
   agentInstalled?: boolean
@@ -345,16 +346,15 @@ export interface DataStore {
   id: number
   name: string
   type: string
-  freeSpace?: number
-  onlineStatus?: boolean
-  zone?: { id: number; name: string }
   storageSize?: number
-  freeSize?: number
+  freeSpace?: number
+  online?: boolean
   active?: boolean
+  zone?: { id: number; name: string }
 }
 
 export interface DataStoresResponse {
-  dataStores: DataStore[]
+  datastores: DataStore[]
 }
 
 // ─── Storage Volume ───────────────────────────────────────────────────────────

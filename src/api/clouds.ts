@@ -82,23 +82,11 @@ export async function listLayouts(instanceTypeCode?: string) {
   return resp.data
 }
 
-export async function listDataStores(zoneId: number): Promise<DataStoresResponse> {
-  const resp = await apiClient.get<DataStoresResponse>(`/api/zones/${zoneId}/data-stores`)
-  return resp.data
-}
-
-export async function listAllDataStores(): Promise<DataStore[]> {
-  const zonesResp = await apiClient.get<ZonesResponse>('/api/zones', { params: { max: 100 } })
-  const zones = zonesResp.data.zones
-  const results = await Promise.all(
-    zones.map((zone) =>
-      apiClient
-        .get<DataStoresResponse>(`/api/zones/${zone.id}/data-stores`)
-        .then((r) => (r.data.dataStores ?? []).map((ds) => ({ ...ds, zone: { id: zone.id, name: zone.name } })))
-        .catch(() => [] as DataStore[]),
-    ),
-  )
-  return results.flat()
+export async function listDataStores(params: { max?: number } = {}): Promise<DataStore[]> {
+  const resp = await apiClient.get<DataStoresResponse>('/api/data-stores', {
+    params: { max: 100, ...params },
+  })
+  return resp.data.datastores ?? []
 }
 
 export async function listInstanceTypes() {

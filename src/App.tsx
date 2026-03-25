@@ -11,6 +11,7 @@ import { HostDetailPage } from '@/features/hosts/HostDetailPage'
 import { ClustersPage } from '@/features/clusters/ClustersPage'
 import { ClusterDetailPage } from '@/features/clusters/ClusterDetailPage'
 import { NetworksPage } from '@/features/networks/NetworksPage'
+import { NetworkDetailPage } from '@/features/networks/NetworkDetailPage'
 import { StoragePage } from '@/features/storage/StoragePage'
 import { StorageDetailPage } from '@/features/storage/StorageDetailPage'
 
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="clusters" element={<ClustersPage />} />
           <Route path="clusters/:id" element={<ClusterDetailPage />} />
           <Route path="networks" element={<NetworksPage />} />
+          <Route path="networks/:id" element={<NetworkDetailPage />} />
           <Route path="storage" element={<StoragePage />} />
           <Route path="storage/:id" element={<StorageDetailPage />} />
         </Route>
