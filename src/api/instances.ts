@@ -35,10 +35,15 @@ export async function getInstance(id: number): Promise<Instance> {
 }
 
 export async function getContainer(id: number): Promise<Container> {
-  const resp = await apiClient.get<{ container: Container }>(
+  const resp = await apiClient.get<{ container: Container & { networkInterfaces?: Container['interfaces'] } }>(
     `/api/containers/${id}`,
   )
-  return resp.data.container
+  const c = resp.data.container
+  // Morpheus may return networkInterfaces instead of interfaces
+  if (!c.interfaces?.length && c.networkInterfaces?.length) {
+    c.interfaces = c.networkInterfaces
+  }
+  return c
 }
 
 export async function getInstanceStats(id: number): Promise<InstanceStats> {

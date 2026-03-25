@@ -145,17 +145,26 @@ export function Sidebar() {
     retry: 0,
   })
 
-  const instances = instancesData?.instances ?? []
-  const hypervisors = (hypervisorsData?.servers ?? []).filter(
-    (s) => s.osMorpheusType !== 'esxi' && s.osType !== 'esxi',
+  const byName = <T extends { name: string }>(arr: T[]) =>
+    [...arr].sort((a, b) => a.name.localeCompare(b.name))
+
+  const instances = byName(instancesData?.instances ?? [])
+  const hypervisors = byName(
+    (hypervisorsData?.servers ?? []).filter(
+      (s) => s.osMorpheusType !== 'esxi' && s.osType !== 'esxi',
+    ),
   )
-  const clusters = clustersData?.clusters ?? []
-  const networks = (networksData?.networks ?? []).filter(
-    (n) => !(n.type?.name ?? '').toLowerCase().includes('vmware'),
+  const clusters = byName(clustersData?.clusters ?? [])
+  const networks = byName(
+    (networksData?.networks ?? []).filter(
+      (n) => !(n.type?.name ?? '').toLowerCase().includes('vmware'),
+    ),
   )
   const DATASTORE_TYPES = ['directory', 'localdir', 'generic', 'localgeneric']
-  const datastores = (datastoresData ?? []).filter(
-    (ds) => DATASTORE_TYPES.includes((ds.type ?? '').toLowerCase()),
+  const datastores = byName(
+    (datastoresData ?? []).filter(
+      (ds) => DATASTORE_TYPES.includes((ds.type ?? '').toLowerCase()),
+    ),
   )
 
   const p = location.pathname
@@ -241,7 +250,7 @@ export function Sidebar() {
               onLabelClick={() => navigate(`/clusters/${cluster.id}`)}
               indent={1}
             >
-              {(cluster.servers ?? []).map((server) => (
+              {byName(cluster.servers ?? []).map((server) => (
                 <TreeItem
                   key={server.id}
                   label={server.name}

@@ -6,6 +6,7 @@ import { Server, Cpu, Network, Tag } from 'lucide-react'
 interface Props {
   instance: Instance
   containerDetail?: Container
+  fallbackHostName?: string
 }
 
 function InfoCard({
@@ -70,7 +71,7 @@ function ResourceGauge({
   )
 }
 
-export function SummaryTab({ instance, containerDetail }: Props) {
+export function SummaryTab({ instance, containerDetail, fallbackHostName }: Props) {
   const container = instance.containers?.[0]
   const stats = instance.stats ?? container?.stats
 
@@ -78,7 +79,7 @@ export function SummaryTab({ instance, containerDetail }: Props) {
     containerDetail?.ip ?? containerDetail?.internalIp ??
     container?.ip ?? container?.internalIp ?? instance.connectionInfo?.[0]?.ip
 
-  const hostName = containerDetail?.server?.name
+  const hostName = containerDetail?.server?.name ?? fallbackHostName
   const interfaces = containerDetail?.interfaces ?? []
 
   return (

@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { getInstance, getContainer, startInstance, stopInstance, restartInstance, suspendInstance } from '@/api/instances'
+import { listServers } from '@/api/servers'
 import { StatusBadge } from '@/components/common/StatusDot'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { SummaryTab } from './tabs/SummaryTab'
@@ -53,7 +54,20 @@ export function VMDetailPage() {
     queryFn: () => getContainer(containerId!),
     enabled: !!containerId,
     staleTime: 30_000,
+    retry: 0,
   })
+
+  // Fallback: look up host from hypervisors cache using instance.servers[]
+  const { data: hypervisorsData } = useQuery({
+    queryKey: ['servers', 'hypervisors'],
+    queryFn: () => listServers({ max: 100, vmHypervisor: true }),
+    staleTime: 60_000,
+  })
+  const fallbackHostName = (() => {
+    if (containerDetail?.server?.name) return undefined // container detail has it, no need
+    const serverId = instance?.servers?.[0]
+    return serverId ? hypervisorsData?.servers?.find((s) => s.id === serverId)?.name : undefined
+  })()
 
   const mutation = useMutation({
     mutationFn: async (action: string) => {
@@ -206,7 +220,7 @@ export function VMDetailPage() {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-auto p-4">
-        {activeTab === 'summary' && <SummaryTab instance={instance} containerDetail={containerDetail} />}
+        {activeTab === 'summary' && <SummaryTab instance={instance} containerDetail={containerDetail} fallbackHostName={fallbackHostName} />}
         {activeTab === 'monitor' && (
           <Suspense fallback={<PageLoader />}>
             <MonitorTab instanceId={instanceId} />
