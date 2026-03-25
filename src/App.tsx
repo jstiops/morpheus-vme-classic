@@ -7,7 +7,9 @@ import { DashboardPage } from '@/features/dashboard/DashboardPage'
 import { VMListPage } from '@/features/vms/VMListPage'
 import { VMDetailPage } from '@/features/vms/VMDetailPage'
 import { HostsPage } from '@/features/hosts/HostsPage'
+import { HostDetailPage } from '@/features/hosts/HostDetailPage'
 import { ClustersPage } from '@/features/clusters/ClustersPage'
+import { ClusterDetailPage } from '@/features/clusters/ClusterDetailPage'
 import { NetworksPage } from '@/features/networks/NetworksPage'
 import { StoragePage } from '@/features/storage/StoragePage'
 
@@ -43,7 +45,9 @@ export default function App() {
           <Route path="vms" element={<VMListPage />} />
           <Route path="vms/:id" element={<VMDetailPage />} />
           <Route path="hosts" element={<HostsPage />} />
+          <Route path="hosts/:id" element={<HostDetailPage />} />
           <Route path="clusters" element={<ClustersPage />} />
+          <Route path="clusters/:id" element={<ClusterDetailPage />} />
           <Route path="networks" element={<NetworksPage />} />
           <Route path="storage" element={<StoragePage />} />
         </Route>

@@ -2,6 +2,7 @@ import { apiClient } from './client'
 import {
   ZonesResponse,
   Zone,
+  Cluster,
   ClustersResponse,
   ServerGroupsResponse,
   NetworksResponse,
@@ -27,6 +28,11 @@ export async function listClusters(
     params: { max: 100, ...params },
   })
   return resp.data
+}
+
+export async function getCluster(id: number): Promise<Cluster> {
+  const resp = await apiClient.get<{ cluster: Cluster }>(`/api/clusters/${id}`)
+  return resp.data.cluster
 }
 
 export async function listServerGroups(

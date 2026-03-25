@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { listInstances } from '@/api/instances'
 import { listServers } from '@/api/servers'
-import { listZones } from '@/api/clouds'
+import { listClusters } from '@/api/clouds'
 import { useNavigate } from 'react-router-dom'
-import { Monitor, Server, Globe, Activity, Play, Square, AlertTriangle, HardDrive } from 'lucide-react'
+import { Monitor, Server, Layers, Activity, Play, Square, AlertTriangle, HardDrive } from 'lucide-react'
 import { formatBytes } from '@/utils/format'
 
 interface StatCardProps {
@@ -59,20 +59,21 @@ export function DashboardPage() {
   })
 
   const { data: serversData } = useQuery({
-    queryKey: ['servers'],
-    queryFn: () => listServers({ max: 50 }),
+    queryKey: ['servers', 'hypervisors'],
+    queryFn: () => listServers({ max: 100, vmHypervisor: true }),
     staleTime: 60_000,
   })
 
-  const { data: zonesData } = useQuery({
-    queryKey: ['zones'],
-    queryFn: () => listZones(),
+  const { data: clustersData } = useQuery({
+    queryKey: ['clusters'],
+    queryFn: () => listClusters(),
     staleTime: 120_000,
+    retry: 0,
   })
 
   const instances = instancesData?.instances ?? []
-  const servers = serversData?.servers ?? []
-  const zones = zonesData?.zones ?? []
+  const servers = (serversData?.servers ?? []).filter(s => s.osMorpheusType !== 'esxi' && s.osType !== 'esxi')
+  const clusters = clustersData?.clusters ?? []
 
   const running = instances.filter((i) => i.status === 'running').length
   const stopped = instances.filter((i) => i.status === 'stopped').length
@@ -119,11 +120,12 @@ export function DashboardPage() {
           onClick={() => navigate('/hosts')}
         />
         <StatCard
-          title="Datacenters"
-          value={zones.length}
-          sub="Clouds / Zones"
-          icon={Globe}
+          title="Clusters"
+          value={clusters.length}
+          sub="Morpheus clusters"
+          icon={Layers}
           color="#A78BFA"
+          onClick={() => navigate('/clusters')}
         />
         <StatCard
           title="Avg CPU Usage"
@@ -268,59 +270,6 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Datacenters Table */}
-      {zones.length > 0 && (
-        <div className="card">
-          <div className="card-title">Datacenters</div>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Instances</th>
-                <th>Servers</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {zones.map((zone) => (
-                <tr key={zone.id}>
-                  <td>
-                    <span className="font-medium text-white">{zone.name}</span>
-                  </td>
-                  <td style={{ color: '#566278' }}>{zone.zoneType?.name ?? '—'}</td>
-                  <td>
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded"
-                      style={{ background: '#1E2A45', color: '#8B9AB0' }}
-                    >
-                      {zone.instanceCount ?? 0}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded"
-                      style={{ background: '#1E2A45', color: '#8B9AB0' }}
-                    >
-                      {zone.serverCount ?? 0}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      className="text-xs"
-                      style={{
-                        color: zone.status === 'ok' || zone.status === 'enabled' ? '#00B388' : '#F59E0B',
-                      }}
-                    >
-                      {zone.status ?? 'unknown'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   )
 }
