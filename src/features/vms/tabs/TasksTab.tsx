@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query'
 import { getInstanceHistory } from '@/api/instances'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { CheckCircle, XCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
 import { clsx } from 'clsx'
 
 interface Props {
@@ -18,8 +17,24 @@ function statusIcon(status: string) {
   return <Clock size={14} style={{ color: '#566278' }} />
 }
 
+function statusColor(status: string) {
+  const s = status.toLowerCase()
+  if (s === 'complete' || s === 'success') return '#00B388'
+  if (s === 'failed' || s === 'error') return '#EF4444'
+  if (s === 'warning') return '#F59E0B'
+  if (s === 'running' || s === 'in-progress') return '#60A5FA'
+  return '#566278'
+}
+
+function formatDuration(ms: number | null) {
+  if (ms == null) return '—'
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(0)}s`
+  return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`
+}
+
 export function TasksTab({ instanceId }: Props) {
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['instance-history', instanceId],
     queryFn: () => getInstanceHistory(instanceId),
     staleTime: 20_000,
@@ -40,7 +55,7 @@ export function TasksTab({ instanceId }: Props) {
           </p>
         </div>
         <button className="btn btn-ghost py-1 px-2" onClick={() => refetch()}>
-          <RefreshCw size={13} />
+          <RefreshCw size={13} className={clsx(isFetching && 'animate-spin')} />
           Refresh
         </button>
       </div>
@@ -51,91 +66,62 @@ export function TasksTab({ instanceId }: Props) {
           <p className="text-sm" style={{ color: '#8B9AB0' }}>No task history</p>
         </div>
       ) : (
-        <div
-          className="rounded-lg overflow-hidden"
-          style={{ border: '1px solid #1E2A45' }}
-        >
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th style={{ width: 28 }} />
-                <th>Task</th>
-                <th>Status</th>
-                <th>Duration</th>
-                <th>User</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {processes.map((proc) => {
-                const ts = proc.startDate ?? proc.dateCreated
-                let ago = ''
-                try {
-                  ago = formatDistanceToNow(new Date(ts), { addSuffix: true })
-                } catch {
-                  ago = ts
-                }
-                const durationMs =
-                  proc.duration ??
-                  (proc.startDate && proc.endDate
-                    ? new Date(proc.endDate).getTime() -
-                      new Date(proc.startDate).getTime()
-                    : null)
+        <div className="space-y-1.5">
+          {processes.map((proc) => {
+            const startDate = proc.startDate ?? proc.dateCreated
+            const durationMs =
+              proc.duration ??
+              (proc.startDate && proc.endDate
+                ? new Date(proc.endDate).getTime() - new Date(proc.startDate).getTime()
+                : null)
 
-                return (
-                  <tr key={proc.id}>
-                    <td className="text-center">
-                      {statusIcon(proc.status)}
-                    </td>
-                    <td>
-                      <div className="font-medium text-white">
-                        {proc.displayName ??
-                          proc.processType?.name ??
-                          proc.description ??
-                          'Unknown'}
-                      </div>
-                      {proc.reason && (
-                        <div className="text-2xs mt-0.5 truncate" style={{ color: '#566278' }}>
-                          {proc.reason}
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <span
-                        className={clsx(
-                          'text-xs',
-                          proc.status.toLowerCase() === 'complete' ||
-                            proc.status.toLowerCase() === 'success'
-                            ? 'text-green-400'
-                            : proc.status.toLowerCase() === 'failed'
-                              ? 'text-red-400'
-                              : 'text-gray-400',
-                        )}
-                      >
-                        {proc.status}
-                        {proc.percent != null && proc.percent < 100 && (
-                          <span className="ml-1">({proc.percent}%)</span>
-                        )}
+            return (
+              <div
+                key={proc.id}
+                className="flex items-start gap-3 px-3 py-2.5 rounded-lg"
+                style={{ background: '#0D1117', border: '1px solid #1E2A45' }}
+              >
+                <div className="mt-0.5 shrink-0">{statusIcon(proc.status)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-white">
+                      {proc.displayName ?? proc.processType?.name ?? proc.description ?? 'Unknown'}
+                    </span>
+                    <span
+                      className="text-2xs px-1.5 py-0.5 rounded"
+                      style={{
+                        background: `${statusColor(proc.status)}22`,
+                        color: statusColor(proc.status),
+                      }}
+                    >
+                      {proc.status}
+                      {proc.percent != null && proc.percent < 100 && ` (${proc.percent}%)`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {startDate && (
+                      <span className="text-2xs" style={{ color: '#566278' }}>
+                        Start: {new Date(startDate).toLocaleString()}
                       </span>
-                    </td>
-                    <td style={{ color: '#8B9AB0' }}>
-                      {durationMs != null
-                        ? durationMs < 1000
-                          ? `${durationMs}ms`
-                          : `${(durationMs / 1000).toFixed(1)}s`
-                        : '—'}
-                    </td>
-                    <td style={{ color: '#8B9AB0' }}>
-                      {proc.createdBy?.username ?? proc.createdBy?.displayName ?? '—'}
-                    </td>
-                    <td style={{ color: '#566278' }} title={ts}>
-                      {ago}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                    )}
+                    <span className="text-2xs" style={{ color: '#566278' }}>
+                      Duration: {formatDuration(durationMs)}
+                    </span>
+                    {(proc.createdBy?.username ?? proc.createdBy?.displayName) && (
+                      <span className="text-2xs" style={{ color: '#566278' }}>
+                        User: {proc.createdBy?.displayName ?? proc.createdBy?.username}
+                      </span>
+                    )}
+                  </div>
+                  {proc.reason && (
+                    <div className="text-2xs mt-0.5 truncate" style={{ color: '#3A4560' }}>
+                      {proc.reason}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
