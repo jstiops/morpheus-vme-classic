@@ -43,9 +43,14 @@ export async function restartServer(id: number) {
   return resp.data
 }
 
-export async function moveServer(serverId: number, targetHostId: number) {
+export async function moveServer(
+  serverId: number,
+  targetHostId: number,
+  placementStrategy: 'auto' | 'failover' | 'pinned' = 'auto',
+) {
   const resp = await apiClient.put(`/api/servers/${serverId}/placement`, {
     server: {
+      placementStrategy,
       preferredParentServer: { id: targetHostId },
     },
   })

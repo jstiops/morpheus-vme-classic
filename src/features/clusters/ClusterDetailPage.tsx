@@ -312,6 +312,7 @@ function ClusterVMsTab({
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [moveOpen, setMoveOpen] = useState(false)
   const [targetHostId, setTargetHostId] = useState<number | null>(null)
+  const [placementStrategy, setPlacementStrategy] = useState<'auto' | 'failover' | 'pinned'>('auto')
   const [moveOps, setMoveOps] = useState<MoveOp[]>([])
   const [justDone, setJustDone] = useState(false)
   const moveOpsRef = useRef(moveOps)
@@ -343,7 +344,7 @@ function ClusterVMsTab({
     refetchInterval: moveOps.length > 0 ? 3_000 : false,
   })
 
-  // ── Detect move completion + auto-restart suspended VMs ───────────────────
+  // ── Detect move completion ─────────────────────────────────────────────────
   useEffect(() => {
     if (moveOps.length === 0) return
     const movingServerIds = new Set(moveOps.map((m) => m.serverId))
@@ -355,14 +356,6 @@ function ClusterVMsTab({
     )
     const timedOut = moveOps.every((m) => Date.now() - m.startedAt > 120_000)
     if ((zoneProcesses !== undefined && running.length === 0) || timedOut) {
-      // Auto-start any moved VM that ended up suspended/stopped after migration
-      const instances = instData?.instances ?? []
-      for (const op of moveOps) {
-        const inst = instances.find((i) => i.id === op.instanceId)
-        if (inst && (inst.status === 'suspended' || inst.status === 'stopped')) {
-          startServer(op.serverId).catch(() => {/* best-effort */})
-        }
-      }
       setMoveOps([])
       setJustDone(true)
       setTimeout(() => setJustDone(false), 3_000)
@@ -370,7 +363,7 @@ function ClusterVMsTab({
       refetchVmServers()
       queryClient.removeQueries({ queryKey: ['zone-processes-move', clusterZoneId] })
     }
-  }, [zoneProcesses, moveOps, clusterZoneId, queryClient, refetch, refetchVmServers, instData])
+  }, [zoneProcesses, moveOps, clusterZoneId, queryClient, refetch, refetchVmServers])
 
   // ── Build host-name map: vmServerId → parentServer.name ───────────────────
   const hostMap = new Map<number, string>()
@@ -404,8 +397,8 @@ function ClusterVMsTab({
   })
 
   const moveMutation = useMutation({
-    mutationFn: async ({ serverIds, hostId }: { serverIds: number[]; hostId: number }) => {
-      return Promise.all(serverIds.map((sid) => moveServer(sid, hostId)))
+    mutationFn: async ({ serverIds, hostId, strategy }: { serverIds: number[]; hostId: number; strategy: 'auto' | 'failover' | 'pinned' }) => {
+      return Promise.all(serverIds.map((sid) => moveServer(sid, hostId, strategy)))
     },
     onSuccess: (_data, { serverIds, hostId }) => {
       const targetHost = clusterHosts.find((h) => h.id === hostId)
@@ -426,6 +419,7 @@ function ClusterVMsTab({
       setMoveOpen(false)
       setSelected(new Set())
       setTargetHostId(null)
+      setPlacementStrategy('auto')
     },
   })
 
@@ -716,6 +710,23 @@ function ClusterVMsTab({
               </select>
             </div>
 
+            {/* Placement strategy */}
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#8B9AB0' }}>
+                Placement Strategy
+              </label>
+              <select
+                className="input"
+                value={placementStrategy}
+                onChange={(e) => setPlacementStrategy(e.target.value as 'auto' | 'failover' | 'pinned')}
+                disabled={moveMutation.isPending}
+              >
+                <option value="auto">Auto</option>
+                <option value="failover">Failover</option>
+                <option value="pinned">Pinned</option>
+              </select>
+            </div>
+
             <div className="flex justify-end gap-2 pt-1">
               <button
                 className="btn btn-secondary"
@@ -727,7 +738,7 @@ function ClusterVMsTab({
               <button
                 className="btn btn-primary"
                 disabled={!targetHostId || moveMutation.isPending}
-                onClick={() => targetHostId && moveMutation.mutate({ serverIds: selectedServerIds, hostId: targetHostId })}
+                onClick={() => targetHostId && moveMutation.mutate({ serverIds: selectedServerIds, hostId: targetHostId, strategy: placementStrategy })}
               >
                 {moveMutation.isPending
                   ? <><Loader2 size={13} className="animate-spin" /> Initiating…</>
