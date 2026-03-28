@@ -1,7 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Camera, Trash2, RotateCcw, Plus, RefreshCw, Loader2 } from 'lucide-react'
-import { getInstanceSnapshots, createSnapshot, deleteSnapshot, revertSnapshot } from '@/api/instances'
+import { Camera, Trash2, RotateCcw, Plus, RefreshCw, Loader2, CheckCircle2 } from 'lucide-react'
+import {
+  getInstanceSnapshots,
+  createSnapshot,
+  deleteSnapshot,
+  revertSnapshot,
+  listProcessesByInstance,
+} from '@/api/instances'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { Modal } from '@/components/common/Modal'
 import { clsx } from 'clsx'
@@ -12,7 +18,13 @@ interface Props {
   instanceId: number
 }
 
+interface PendingOp {
+  label: string
+  startedAt: number
+}
+
 const BUSY_STATUSES = ['queued', 'creating', 'in-progress', 'running', 'deleting']
+const OP_TIMEOUT_MS = 120_000 // 2 min hard stop
 
 function isBusy(status?: string) {
   return BUSY_STATUSES.includes((status ?? '').toLowerCase())
@@ -24,19 +36,52 @@ export function SnapshotsTab({ instanceId }: Props) {
   const [snapshotName, setSnapshotName] = useState('')
   const [snapshotDesc, setSnapshotDesc] = useState('')
   const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null)
-  const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set())
+  const [pendingOp, setPendingOp] = useState<PendingOp | null>(null)
+  const [justDone, setJustDone] = useState(false)
 
-  const { data, isLoading, isFetching, refetch } = useQuery({
+  // ── Snapshot list ──────────────────────────────────────────────────────────
+  const { data: snapData, isLoading, refetch: refetchSnaps } = useQuery({
     queryKey: ['instance-snapshots', instanceId],
     queryFn: () => getInstanceSnapshots(instanceId),
     staleTime: 10_000,
-    // Poll every 4s if any snapshot is in a busy state
-    refetchInterval: (query) => {
-      const snaps = query.state.data?.snapshots ?? []
-      return snaps.some((s) => isBusy(s.status)) ? 4_000 : false
-    },
+    refetchInterval: pendingOp ? 4_000 : false,
   })
 
+  // ── Process monitor — only active while an op is pending ──────────────────
+  const { data: processData } = useQuery({
+    queryKey: ['instance-processes', instanceId],
+    queryFn: () => listProcessesByInstance(instanceId),
+    enabled: !!pendingOp,
+    staleTime: 0,
+    refetchInterval: pendingOp ? 3_000 : false,
+  })
+
+  const runningProcess = pendingOp
+    ? (processData?.processes ?? []).find(
+        (p) => p.status === 'running' || p.status === 'in-progress',
+      )
+    : undefined
+
+  // ── Detect completion ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!pendingOp) return
+
+    const snaps = snapData?.snapshots ?? []
+    const snapshotsBusy = snaps.some((s) => isBusy(s.status))
+    const processDone = processData !== undefined && !runningProcess
+    const timedOut = Date.now() - pendingOp.startedAt > OP_TIMEOUT_MS
+
+    if ((processDone && !snapshotsBusy) || timedOut) {
+      setPendingOp(null)
+      refetchSnaps()
+      setJustDone(true)
+      setTimeout(() => setJustDone(false), 2_500)
+      // Invalidate process cache so it stops polling
+      queryClient.removeQueries({ queryKey: ['instance-processes', instanceId] })
+    }
+  }, [processData, snapData, runningProcess, pendingOp, instanceId, queryClient, refetchSnaps])
+
+  // ── Mutations ──────────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: () =>
       createSnapshot(instanceId, { name: snapshotName, description: snapshotDesc }),
@@ -44,90 +89,129 @@ export function SnapshotsTab({ instanceId }: Props) {
       setCreateOpen(false)
       setSnapshotName('')
       setSnapshotDesc('')
-      toast.success('Snapshot creation queued')
-      // Poll every 4s to pick up the new snapshot as it progresses
+      setPendingOp({ label: `Creating snapshot "${snapshotName}"`, startedAt: Date.now() })
       queryClient.invalidateQueries({ queryKey: ['instance-snapshots', instanceId] })
     },
-    onError: () => {
-      toast.error('Failed to create snapshot')
-    },
+    onError: () => toast.error('Failed to create snapshot'),
   })
 
   const deleteMutation = useMutation({
-    mutationFn: async (snapshotId: number) => {
-      setDeletingIds((prev) => new Set(prev).add(snapshotId))
-      return deleteSnapshot(instanceId, snapshotId)
-    },
-    onSuccess: (_data, snapshotId) => {
-      toast.success('Snapshot deleted')
+    mutationFn: (snapshotId: number) => deleteSnapshot(instanceId, snapshotId),
+    onSuccess: (_data, _snapshotId) => {
+      const name = confirmDelete?.name ?? 'snapshot'
       setConfirmDelete(null)
-      setDeletingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(snapshotId)
-        return next
-      })
+      setPendingOp({ label: `Deleting snapshot "${name}"`, startedAt: Date.now() })
       queryClient.invalidateQueries({ queryKey: ['instance-snapshots', instanceId] })
     },
-    onError: (_err, snapshotId) => {
-      toast.error('Failed to delete snapshot')
-      setDeletingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(snapshotId)
-        return next
-      })
-    },
+    onError: () => toast.error('Failed to delete snapshot'),
   })
 
   const revertMutation = useMutation({
     mutationFn: (snapshotId: number) => revertSnapshot(instanceId, snapshotId),
-    onSuccess: () => {
-      toast.success('Revert initiated')
+    onSuccess: (_data, snapshotId) => {
+      const name = snapData?.snapshots.find((s) => s.id === snapshotId)?.name ?? 'snapshot'
+      setPendingOp({ label: `Reverting to "${name}"`, startedAt: Date.now() })
       queryClient.invalidateQueries({ queryKey: ['instance-snapshots', instanceId] })
       queryClient.invalidateQueries({ queryKey: ['instance', instanceId] })
     },
-    onError: () => {
-      toast.error('Failed to revert snapshot')
-    },
+    onError: () => toast.error('Failed to revert snapshot'),
   })
 
   if (isLoading) return <PageLoader />
 
-  const snapshots = data?.snapshots ?? []
-  const anyBusy = snapshots.some((s) => isBusy(s.status))
+  const snapshots = snapData?.snapshots ?? []
+  const isMutating = createMutation.isPending || deleteMutation.isPending || revertMutation.isPending
+
+  const progressLabel = runningProcess
+    ? [runningProcess.displayName, runningProcess.processType?.name]
+        .filter(Boolean)
+        .join(' – ') || pendingOp?.label
+    : pendingOp?.label
+
+  const progressPct = runningProcess?.percent ?? null
 
   return (
     <div className="max-w-3xl space-y-4">
-      {/* Header */}
+      {/* ── Operation progress banner ── */}
+      {pendingOp && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-lg"
+          style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)' }}
+        >
+          <Loader2 size={16} className="animate-spin shrink-0" style={{ color: '#60A5FA' }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium" style={{ color: '#60A5FA' }}>
+              {progressLabel}
+            </p>
+            {progressPct != null && (
+              <div className="mt-1.5">
+                <div className="progress-bar">
+                  <div
+                    className="progress-fill green"
+                    style={{ width: `${progressPct}%`, transition: 'width 0.5s ease' }}
+                  />
+                </div>
+                <p className="text-2xs mt-0.5" style={{ color: '#566278' }}>{progressPct}%</p>
+              </div>
+            )}
+            {progressPct == null && (
+              <p className="text-2xs mt-0.5" style={{ color: '#566278' }}>
+                Monitoring task progress…
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Done flash ── */}
+      {justDone && !pendingOp && (
+        <div
+          className="flex items-center gap-3 px-4 py-3 rounded-lg"
+          style={{ background: 'rgba(0,179,136,0.1)', border: '1px solid rgba(0,179,136,0.3)' }}
+        >
+          <CheckCircle2 size={16} style={{ color: '#00B388' }} />
+          <p className="text-xs font-medium" style={{ color: '#00B388' }}>Operation completed</p>
+        </div>
+      )}
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-white">Snapshots</h3>
           <p className="text-xs mt-0.5" style={{ color: '#566278' }}>
             {snapshots.length} snapshot{snapshots.length !== 1 ? 's' : ''}
-            {anyBusy && (
-              <span className="ml-2" style={{ color: '#60A5FA' }}>
-                — operation in progress
-              </span>
-            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn btn-ghost py-1 px-2" onClick={() => refetch()} title="Refresh">
-            <RefreshCw size={13} className={clsx(isFetching && 'animate-spin')} />
+          <button
+            className="btn btn-ghost py-1 px-2"
+            onClick={() => refetchSnaps()}
+            title="Refresh"
+          >
+            <RefreshCw size={13} />
           </button>
-          <button className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+          <button
+            className="btn btn-primary"
+            onClick={() => setCreateOpen(true)}
+            disabled={!!pendingOp || isMutating}
+          >
             <Plus size={13} />
             Take Snapshot
           </button>
         </div>
       </div>
 
-      {/* Snapshots List */}
+      {/* ── Snapshots list ── */}
       {snapshots.length === 0 ? (
         <div className="empty-state">
           <Camera size={32} style={{ color: '#566278' }} />
           <p className="text-sm" style={{ color: '#8B9AB0' }}>No snapshots</p>
           <p className="text-xs">Take a snapshot to save the current VM state</p>
-          <button className="btn btn-secondary" onClick={() => setCreateOpen(true)}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setCreateOpen(true)}
+            disabled={!!pendingOp}
+          >
             <Plus size={13} />
             Take Snapshot
           </button>
@@ -136,27 +220,24 @@ export function SnapshotsTab({ instanceId }: Props) {
         <div className="space-y-2">
           {snapshots.map((snap) => {
             const busy = isBusy(snap.status)
-            const deleting = deletingIds.has(snap.id)
 
             return (
               <div
                 key={snap.id}
-                className={clsx('flex items-center gap-3 p-3 rounded-lg', deleting && 'opacity-50')}
+                className={clsx(
+                  'flex items-center gap-3 p-3 rounded-lg',
+                  (pendingOp || busy) && 'opacity-60',
+                )}
                 style={{
                   background: '#141C2E',
                   border: `1px solid ${snap.currentlyActive ? 'rgba(0,179,136,0.3)' : '#1E2A45'}`,
                 }}
               >
-                {/* Icon — spinner when busy */}
-                {busy || deleting ? (
-                  <Loader2 size={16} className="animate-spin shrink-0" style={{ color: '#60A5FA' }} />
-                ) : (
-                  <Camera
-                    size={16}
-                    style={{ color: snap.currentlyActive ? '#00B388' : '#566278' }}
-                    className="shrink-0"
-                  />
-                )}
+                <Camera
+                  size={16}
+                  style={{ color: snap.currentlyActive ? '#00B388' : '#566278' }}
+                  className="shrink-0"
+                />
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -203,27 +284,19 @@ export function SnapshotsTab({ instanceId }: Props) {
                   <button
                     className="btn btn-ghost py-1 px-2 text-xs"
                     onClick={() => revertMutation.mutate(snap.id)}
-                    disabled={busy || deleting || revertMutation.isPending}
+                    disabled={!!pendingOp || isMutating}
                     title="Revert to this snapshot"
                   >
-                    {revertMutation.isPending ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <RotateCcw size={12} />
-                    )}
+                    <RotateCcw size={12} />
                     Revert
                   </button>
                   <button
                     className="btn btn-ghost py-1 px-2"
                     onClick={() => setConfirmDelete({ id: snap.id, name: snap.name })}
-                    disabled={busy || deleting}
+                    disabled={!!pendingOp || isMutating}
                     title="Delete snapshot"
                   >
-                    {deleting ? (
-                      <Loader2 size={12} className="animate-spin" style={{ color: '#EF4444' }} />
-                    ) : (
-                      <Trash2 size={12} style={{ color: '#EF4444' }} />
-                    )}
+                    <Trash2 size={12} style={{ color: '#EF4444' }} />
                   </button>
                 </div>
               </div>
@@ -232,7 +305,7 @@ export function SnapshotsTab({ instanceId }: Props) {
         </div>
       )}
 
-      {/* Create Snapshot Modal */}
+      {/* ── Create Snapshot Modal ── */}
       {createOpen && (
         <Modal
           title="Take Snapshot"
@@ -253,10 +326,7 @@ export function SnapshotsTab({ instanceId }: Props) {
                 disabled={!snapshotName || createMutation.isPending}
               >
                 {createMutation.isPending ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    Creating…
-                  </>
+                  <><Loader2 size={13} className="animate-spin" /> Queuing…</>
                 ) : 'Take Snapshot'}
               </button>
             </>
@@ -293,7 +363,7 @@ export function SnapshotsTab({ instanceId }: Props) {
         </Modal>
       )}
 
-      {/* Confirm Delete Modal */}
+      {/* ── Confirm Delete Modal ── */}
       {confirmDelete !== null && (
         <Modal
           title="Delete Snapshot"
@@ -314,10 +384,7 @@ export function SnapshotsTab({ instanceId }: Props) {
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    Deleting…
-                  </>
+                  <><Loader2 size={13} className="animate-spin" /> Deleting…</>
                 ) : 'Delete Snapshot'}
               </button>
             </>

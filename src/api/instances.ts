@@ -51,6 +51,16 @@ export async function getProcess(id: number): Promise<ProcessEvent> {
   return resp.data.process
 }
 
+export async function listProcessesByInstance(
+  id: number,
+  params: { max?: number } = {},
+): Promise<ProcessesResponse> {
+  const resp = await apiClient.get<ProcessesResponse>('/api/processes', {
+    params: { instanceId: id, max: 5, ...params },
+  })
+  return resp.data
+}
+
 export async function getInstanceHistory(
   id: number,
   params: { max?: number; offset?: number } = {},
