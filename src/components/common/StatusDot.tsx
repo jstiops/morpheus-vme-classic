@@ -18,7 +18,8 @@ const STATUS_LABELS: Record<string, string> = {
   provisioned: 'Provisioned',
   starting: 'Starting',
   stopping: 'Stopping',
-  maintenance: 'Maintenance',
+  maintenance:    'Maintenance',
+  maintenancing:  'Maintenancing',
 }
 
 export function StatusDot({ status, size = 8, showLabel = false }: Props) {
@@ -61,7 +62,8 @@ export function StatusBadge({ status }: { status: string }) {
     suspended:    { bg: 'rgba(245,158,11,0.15)',   text: '#F59E0B' },
     failed:       { bg: 'rgba(239,68,68,0.15)',    text: '#EF4444' },
     warning:      { bg: 'rgba(245,158,11,0.15)',   text: '#F59E0B' },
-    maintenance:  { bg: 'rgba(245,158,11,0.15)',   text: '#F59E0B' },
+    maintenance:    { bg: 'rgba(245,158,11,0.15)',   text: '#F59E0B' },
+    maintenancing:  { bg: 'rgba(96,165,250,0.15)',   text: '#60A5FA' },
     provisioning: { bg: 'rgba(59,130,246,0.15)',   text: '#60A5FA' },
     starting:     { bg: 'rgba(59,130,246,0.15)',   text: '#60A5FA' },
     stopping:     { bg: 'rgba(107,114,128,0.15)',  text: '#9CA3AF' },
