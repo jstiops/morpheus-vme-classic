@@ -90,7 +90,12 @@ export function ClusterDetailPage() {
             clusterHosts={cluster.servers ?? []}
           />
         )}
-        {activeTab === 'hosts' && <ClusterHostsTab clusterServerIds={(cluster.servers ?? []).map((s) => s.id)} />}
+        {activeTab === 'hosts' && (
+          <ClusterHostsTab
+            clusterServerIds={(cluster.servers ?? []).map((s) => s.id)}
+            clusterZoneId={cluster.zone?.id}
+          />
+        )}
         {activeTab === 'tasks' && cluster.zone?.id && (
           <ClusterTasksTab
             zoneId={cluster.zone.id}
@@ -174,16 +179,25 @@ interface MaintOp {
   startedAt: number
 }
 
-function ClusterHostsTab({ clusterServerIds }: { clusterServerIds: number[] }) {
+function ClusterHostsTab({ clusterServerIds, clusterZoneId }: { clusterServerIds: number[]; clusterZoneId?: number }) {
   const navigate = useNavigate()
   const [maintOp, setMaintOp] = useState<MaintOp | null>(null)
   const [maintJustDone, setMaintJustDone] = useState(false)
+  const [confirmMaint, setConfirmMaint] = useState<{ hostId: number; hostName: string } | null>(null)
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['servers', 'hypervisors'],
     queryFn: () => listServers({ max: 100, vmHypervisor: true }),
     staleTime: maintOp ? 0 : 30_000,
     refetchInterval: maintOp ? 3_000 : false,
+  })
+
+  // VM-level servers in the zone — needed to show which VMs are on a host
+  const { data: vmServersData } = useQuery({
+    queryKey: ['vm-servers', clusterZoneId],
+    queryFn: () => listServers({ max: 200, zoneId: clusterZoneId }),
+    enabled: !!clusterZoneId,
+    staleTime: 60_000,
   })
 
   const maintenanceMutation = useMutation({
@@ -361,7 +375,13 @@ function ClusterHostsTab({ clusterServerIds }: { clusterServerIds: number[] }) {
                             className={clsx('btn py-1 px-2 text-xs', inMaint ? 'btn-secondary' : 'btn-ghost')}
                             style={inMaint ? { color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' } : {}}
                             disabled={busy || !!maintOp}
-                            onClick={() => maintenanceMutation.mutate({ id: server.id, enable: !inMaint })}
+                            onClick={() => {
+                              if (!inMaint) {
+                                setConfirmMaint({ hostId: server.id, hostName: server.name })
+                              } else {
+                                maintenanceMutation.mutate({ id: server.id, enable: false })
+                              }
+                            }}
                             title={inMaint ? 'Leave maintenance mode' : 'Enter maintenance mode'}
                           >
                             {busy
@@ -380,6 +400,121 @@ function ClusterHostsTab({ clusterServerIds }: { clusterServerIds: number[] }) {
           </table>
         </div>
       )}
+
+      {/* ── Enable Maintenance Confirm Modal ── */}
+      {confirmMaint && (() => {
+        const vmsOnHost = (vmServersData?.servers ?? []).filter(
+          (s) => s.parentServer?.id === confirmMaint.hostId,
+        )
+        const willMigrate = vmsOnHost.filter(
+          (s) => s.placementStrategy === 'auto' || s.placementStrategy === 'failover' || !s.placementStrategy,
+        )
+        const pinned = vmsOnHost.filter((s) => s.placementStrategy === 'pinned')
+
+        return (
+          <div
+            className="fixed inset-0 flex items-center justify-center z-50"
+            style={{ background: 'rgba(0,0,0,0.6)' }}
+            onClick={() => !maintenanceMutation.isPending && setConfirmMaint(null)}
+          >
+            <div
+              className="rounded-xl p-6 space-y-4"
+              style={{ background: '#141C2E', border: '1px solid #1E2A45', width: 480 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <Wrench size={16} className="shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
+                <div>
+                  <h2 className="text-sm font-semibold text-white">
+                    Enable Maintenance Mode on {confirmMaint.hostName}?
+                  </h2>
+                  <p className="text-xs mt-1" style={{ color: '#8B9AB0' }}>
+                    Virtual machines with <span className="text-white font-medium">auto</span> or <span className="text-white font-medium">failover</span> placement strategy will be live-migrated to other available hosts.
+                  </p>
+                </div>
+              </div>
+
+              {vmsOnHost.length === 0 ? (
+                <p className="text-xs px-3 py-2 rounded" style={{ background: '#0D1117', color: '#566278' }}>
+                  No virtual machines are currently running on this host.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {willMigrate.length > 0 && (
+                    <div>
+                      <p className="text-2xs font-medium mb-1" style={{ color: '#8B9AB0' }}>
+                        Will be migrated ({willMigrate.length}):
+                      </p>
+                      <div className="space-y-1 max-h-32 overflow-auto">
+                        {willMigrate.map((s) => (
+                          <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: '#0D1117' }}>
+                            <Monitor size={11} style={{ color: '#00B388' }} />
+                            <span className="text-xs text-white flex-1">{s.name}</span>
+                            <span
+                              className="text-2xs px-1.5 py-0.5 rounded capitalize"
+                              style={{ background: 'rgba(86,98,120,0.2)', color: '#8B9AB0' }}
+                            >
+                              {s.placementStrategy ?? 'auto'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {pinned.length > 0 && (
+                    <div>
+                      <p className="text-2xs font-medium mb-1" style={{ color: '#F59E0B' }}>
+                        Pinned — will NOT be automatically migrated ({pinned.length}):
+                      </p>
+                      <div className="space-y-1 max-h-24 overflow-auto">
+                        {pinned.map((s) => (
+                          <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: '#0D1117' }}>
+                            <Monitor size={11} style={{ color: '#566278' }} />
+                            <span className="text-xs text-white flex-1">{s.name}</span>
+                            <span
+                              className="text-2xs px-1.5 py-0.5 rounded"
+                              style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}
+                            >
+                              pinned
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setConfirmMaint(null)}
+                  disabled={maintenanceMutation.isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ background: 'rgba(245,158,11,0.2)', borderColor: 'rgba(245,158,11,0.4)', color: '#F59E0B' }}
+                  disabled={maintenanceMutation.isPending}
+                  onClick={() => {
+                    maintenanceMutation.mutate(
+                      { id: confirmMaint.hostId, enable: true },
+                      { onSuccess: () => setConfirmMaint(null) },
+                    )
+                  }}
+                >
+                  {maintenanceMutation.isPending
+                    ? <><Loader2 size={13} className="animate-spin" /> Enabling…</>
+                    : <><Wrench size={13} /> Enable Maintenance Mode</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
