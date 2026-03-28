@@ -184,26 +184,20 @@ export function Sidebar() {
         </button>
 
         {/* Virtual Machines */}
-        <Section
-          id="vms"
-          label="Virtual Machines"
-          icon={Monitor}
-          count={instances.length}
-          expanded={expanded.has('vms')}
-          onToggle={() => toggle('vms')}
-          active={p === '/vms'}
-          onLabelClick={() => navigate('/vms')}
+        <button
+          className={clsx('tree-node w-full text-left', p.startsWith('/vms') && 'selected')}
+          style={{ paddingLeft: 8 }}
+          onClick={() => navigate('/vms')}
         >
-          {instances.map((inst) => (
-            <TreeItem
-              key={inst.id}
-              label={inst.name}
-              statusDot={inst.status}
-              active={p === `/vms/${inst.id}`}
-              onClick={() => navigate(`/vms/${inst.id}`)}
-            />
-          ))}
-        </Section>
+          <Monitor size={12} className="shrink-0" />
+          <span className="truncate flex-1 text-xs">Virtual Machines</span>
+          <span
+            className="text-2xs px-1 rounded shrink-0"
+            style={{ background: '#1E2A45', color: '#566278' }}
+          >
+            {instances.length}
+          </span>
+        </button>
 
         {/* Hosts */}
         <Section
