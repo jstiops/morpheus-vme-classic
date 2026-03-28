@@ -343,7 +343,7 @@ function ClusterVMsTab({
     refetchInterval: moveOps.length > 0 ? 3_000 : false,
   })
 
-  // ── Detect move completion ─────────────────────────────────────────────────
+  // ── Detect move completion + auto-restart suspended VMs ───────────────────
   useEffect(() => {
     if (moveOps.length === 0) return
     const movingServerIds = new Set(moveOps.map((m) => m.serverId))
@@ -355,14 +355,22 @@ function ClusterVMsTab({
     )
     const timedOut = moveOps.every((m) => Date.now() - m.startedAt > 120_000)
     if ((zoneProcesses !== undefined && running.length === 0) || timedOut) {
+      // Auto-start any moved VM that ended up suspended/stopped after migration
+      const instances = instData?.instances ?? []
+      for (const op of moveOps) {
+        const inst = instances.find((i) => i.id === op.instanceId)
+        if (inst && (inst.status === 'suspended' || inst.status === 'stopped')) {
+          startServer(op.serverId).catch(() => {/* best-effort */})
+        }
+      }
       setMoveOps([])
       setJustDone(true)
-      setTimeout(() => setJustDone(false), 2_500)
+      setTimeout(() => setJustDone(false), 3_000)
       refetch()
       refetchVmServers()
       queryClient.removeQueries({ queryKey: ['zone-processes-move', clusterZoneId] })
     }
-  }, [zoneProcesses, moveOps, clusterZoneId, queryClient, refetch, refetchVmServers])
+  }, [zoneProcesses, moveOps, clusterZoneId, queryClient, refetch, refetchVmServers, instData])
 
   // ── Build host-name map: vmServerId → parentServer.name ───────────────────
   const hostMap = new Map<number, string>()
@@ -439,43 +447,61 @@ function ClusterVMsTab({
 
   return (
     <div className="space-y-3" style={{ maxWidth: '100%' }}>
-      {/* ── Move progress banner ── */}
-      {moveOps.length > 0 && (
-        <div
-          className="rounded-lg p-3 space-y-2"
-          style={{ background: 'rgba(96,165,250,0.08)', border: '1px solid rgba(96,165,250,0.3)' }}
-        >
-          <div className="flex items-center gap-2">
-            <Loader2 size={14} className="animate-spin shrink-0" style={{ color: '#60A5FA' }} />
-            <span className="text-xs font-medium" style={{ color: '#60A5FA' }}>
-              Moving {moveOps.length} VM{moveOps.length !== 1 ? 's' : ''}…
-            </span>
-          </div>
-          <div className="space-y-1 pl-5">
-            {moveOps.map((op) => {
-              const proc = (zoneProcesses?.processes ?? []).find(
-                (p) => p.serverId === op.serverId && (p.status === 'running' || p.status === 'in-progress'),
-              )
-              return (
-                <div key={op.instanceId} className="flex items-center gap-2">
-                  <Loader2 size={11} className="animate-spin shrink-0" style={{ color: '#60A5FA' }} />
-                  <span className="text-2xs" style={{ color: '#8B9AB0' }}>
-                    {op.instanceName} → {op.targetHostName}
-                    {proc?.percent != null && ` (${proc.percent}%)`}
-                  </span>
+      {/* ── Move progress banner (snapshot-style) ── */}
+      {moveOps.length > 0 && (() => {
+        const allProcs = zoneProcesses?.processes ?? []
+        // Pick the most representative running process for progress display
+        const activeProc = allProcs.find(
+          (p) =>
+            (p.status === 'running' || p.status === 'in-progress') &&
+            moveOps.some((m) => m.serverId === p.serverId),
+        )
+        const progressLabel = activeProc
+          ? ([activeProc.displayName, activeProc.processType?.name].filter(Boolean).join(' – ') ||
+            `Moving ${moveOps.length} VM${moveOps.length !== 1 ? 's' : ''}`)
+          : `Moving ${moveOps.length} VM${moveOps.length !== 1 ? 's' : ''} to ${moveOps[0]?.targetHostName}…`
+        const progressPct = activeProc?.percent ?? null
+
+        return (
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-lg"
+            style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.3)' }}
+          >
+            <Loader2 size={16} className="animate-spin shrink-0" style={{ color: '#60A5FA' }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium" style={{ color: '#60A5FA' }}>{progressLabel}</p>
+              {moveOps.length > 1 && (
+                <p className="text-2xs mt-0.5" style={{ color: '#566278' }}>
+                  {moveOps.map((m) => m.instanceName).join(', ')}
+                </p>
+              )}
+              {progressPct != null && (
+                <div className="mt-1.5">
+                  <div className="progress-bar">
+                    <div
+                      className="progress-fill green"
+                      style={{ width: `${progressPct}%`, transition: 'width 0.5s ease' }}
+                    />
+                  </div>
+                  <p className="text-2xs mt-0.5" style={{ color: '#566278' }}>{progressPct}%</p>
                 </div>
-              )
-            })}
+              )}
+              {progressPct == null && (
+                <p className="text-2xs mt-0.5" style={{ color: '#566278' }}>
+                  Monitoring task progress…
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {justDone && moveOps.length === 0 && (
         <div
-          className="flex items-center gap-2 px-3 py-2.5 rounded-lg"
+          className="flex items-center gap-2 px-4 py-3 rounded-lg"
           style={{ background: 'rgba(0,179,136,0.1)', border: '1px solid rgba(0,179,136,0.3)' }}
         >
-          <CheckCircle2 size={14} style={{ color: '#00B388' }} />
+          <CheckCircle2 size={16} style={{ color: '#00B388' }} />
           <span className="text-xs font-medium" style={{ color: '#00B388' }}>Migration completed</span>
         </div>
       )}
