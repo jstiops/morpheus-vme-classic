@@ -392,6 +392,14 @@ function ClusterVMsTab({
       hasSeenRunningRef.current = false
       return
     }
+
+    // Primary: host-map check — VM's parentServer updated to the target host
+    const allMoved = moveOps.every((op) => {
+      const srv = (vmServersData?.servers ?? []).find((s) => s.id === op.serverId)
+      return srv?.parentServer?.name === op.targetHostName
+    })
+
+    // Secondary: process-based detection (zone processes)
     const movingServerIds = new Set(moveOps.map((m) => m.serverId))
     const running = (zoneProcesses?.processes ?? []).filter(
       (p) =>
@@ -400,13 +408,18 @@ function ClusterVMsTab({
         movingServerIds.has(p.serverId),
     )
     if (running.length > 0) hasSeenRunningRef.current = true
-
-    const timedOut = moveOps.every((m) => Date.now() - m.startedAt > 120_000)
-    // Grace period: don't mark done for first 8s (lets Morpheus register the task)
-    const gracePassed = moveOps.every((m) => Date.now() - m.startedAt > 8_000)
     const processDone = zoneProcesses !== undefined && running.length === 0
 
-    if (((hasSeenRunningRef.current || gracePassed) && processDone) || timedOut) {
+    const timedOut = moveOps.every((m) => Date.now() - m.startedAt > 120_000)
+    // Grace period fallback: after 20s assume done if no running processes found
+    const gracePassed = moveOps.every((m) => Date.now() - m.startedAt > 20_000)
+
+    if (
+      allMoved ||
+      (hasSeenRunningRef.current && processDone) ||
+      (gracePassed && processDone) ||
+      timedOut
+    ) {
       hasSeenRunningRef.current = false
       setMoveOps([])
       setJustDone(true)
@@ -415,7 +428,7 @@ function ClusterVMsTab({
       refetchVmServers()
       queryClient.removeQueries({ queryKey: ['zone-processes-move', clusterZoneId] })
     }
-  }, [zoneProcesses, moveOps, clusterZoneId, queryClient, refetch, refetchVmServers])
+  }, [zoneProcesses, vmServersData, moveOps, clusterZoneId, queryClient, refetch, refetchVmServers])
 
   // ── Build host-name map: vmServerId → parentServer.name ───────────────────
   const hostMap = new Map<number, string>()
