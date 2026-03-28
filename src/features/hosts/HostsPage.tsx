@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { listServers } from '@/api/servers'
 import { StatusBadge } from '@/components/common/StatusDot'
 import { PageLoader } from '@/components/common/LoadingSpinner'
@@ -8,6 +9,7 @@ import { Search, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
 
 export function HostsPage() {
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['servers', 'hypervisors'],
@@ -86,7 +88,8 @@ export function HostsPage() {
                 const memPct = memMax > 0 ? (memUsed / memMax) * 100 : 0
 
                 return (
-                  <tr key={server.id}>
+                  <tr key={server.id} className="cursor-pointer" onClick={() => navigate(`/hosts/${server.id}`)}>
+
                     <td>
                       <span className="font-medium text-white">{server.name}</span>
                       {server.hostname && server.hostname !== server.name && (
