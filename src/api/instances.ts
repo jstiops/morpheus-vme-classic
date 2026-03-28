@@ -103,10 +103,8 @@ export async function createSnapshot(
   return resp.data
 }
 
-export async function deleteSnapshot(instanceId: number, snapshotId: number) {
-  const resp = await apiClient.delete(
-    `/api/instances/${instanceId}/snapshots/${snapshotId}`,
-  )
+export async function deleteSnapshot(_instanceId: number, snapshotId: number) {
+  const resp = await apiClient.delete(`/api/snapshots/${snapshotId}`)
   return resp.data
 }
 
