@@ -77,6 +77,13 @@ export async function leaveMaintenanceMode(id: number) {
   return resp.data
 }
 
+export async function updateServer(id: number, payload: { description?: string; name?: string }) {
+  const resp = await apiClient.put<{ server: ComputeServer }>(`/api/servers/${id}`, {
+    server: payload,
+  })
+  return resp.data.server
+}
+
 export async function getZoneHistory(
   zoneId: number,
   params: { max?: number } = {},

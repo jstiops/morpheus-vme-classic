@@ -5,7 +5,7 @@ import { formatBytes, formatPercent } from '@/utils/format'
 import { StatusBadge } from '@/components/common/StatusDot'
 import type { Instance, ComputeServer } from '@/types/morpheus'
 import { Server, Cpu, Network, Tag, Pencil, X, Check, Loader2, FileText } from 'lucide-react'
-import { updateInstance } from '@/api/instances'
+import { updateServer } from '@/api/servers'
 
 interface Props {
   instance: Instance
@@ -74,15 +74,23 @@ function ResourceGauge({
   )
 }
 
-function DescriptionCard({ instance }: { instance: Instance }) {
+function DescriptionCard({ instance, vmServer }: { instance: Instance; vmServer?: ComputeServer }) {
   const queryClient = useQueryClient()
+  const description = vmServer?.description ?? instance.description ?? ''
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(instance.description ?? '')
+  const [draft, setDraft] = useState(description)
 
   const mutation = useMutation({
-    mutationFn: (description: string) => updateInstance(instance.id, { description }),
+    mutationFn: (desc: string) => {
+      if (vmServer) {
+        return updateServer(vmServer.id, { description: desc })
+      }
+      // fallback: no server record available
+      return Promise.reject(new Error('No server record available to update'))
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['instance', instance.id] })
+      if (vmServer) queryClient.invalidateQueries({ queryKey: ['server', vmServer.id] })
       setEditing(false)
       toast.success('Description saved')
     },
@@ -93,13 +101,13 @@ function DescriptionCard({ instance }: { instance: Instance }) {
   })
 
   const startEdit = () => {
-    setDraft(instance.description ?? '')
+    setDraft(description)
     setEditing(true)
   }
 
   const cancel = () => {
     setEditing(false)
-    setDraft(instance.description ?? '')
+    setDraft(description)
   }
 
   return (
@@ -156,9 +164,9 @@ function DescriptionCard({ instance }: { instance: Instance }) {
       ) : (
         <p
           className="text-xs mt-1 whitespace-pre-wrap"
-          style={{ color: instance.description ? '#D4D9E3' : '#566278' }}
+          style={{ color: description ? '#D4D9E3' : '#566278' }}
         >
-          {instance.description || 'No description set.'}
+          {description || 'No description set.'}
         </p>
       )}
     </div>
@@ -289,7 +297,7 @@ export function SummaryTab({ instance, vmServer }: Props) {
       />
 
       {/* Description */}
-      <DescriptionCard instance={instance} />
+      <DescriptionCard instance={instance} vmServer={vmServer} />
 
       {/* Network */}
       <div className="card">
