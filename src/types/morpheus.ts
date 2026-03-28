@@ -175,6 +175,8 @@ export interface ComputeServer {
   lastUpdated: string
   managed?: boolean
   enabled?: boolean
+  placementStrategy?: string
+  maintenanceMode?: boolean
 }
 
 export interface ServerStats {

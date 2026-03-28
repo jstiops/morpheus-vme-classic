@@ -3,10 +3,10 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getCluster } from '@/api/clouds'
 import { listInstances } from '@/api/instances'
-import { listServers, getZoneHistory, startServer, stopServer, restartServer, moveServer } from '@/api/servers'
+import { listServers, getZoneHistory, startServer, stopServer, restartServer, moveServer, setServerPlacementStrategy, enableMaintenanceMode, leaveMaintenanceMode } from '@/api/servers'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusDot'
-import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2, Wrench, Tag } from 'lucide-react'
 import { formatBytes, formatPercent } from '@/utils/format'
 import { clsx } from 'clsx'
 
@@ -169,10 +169,26 @@ function ClusterSummaryTab({ cluster }: { cluster: Awaited<ReturnType<typeof get
 
 function ClusterHostsTab({ clusterServerIds }: { clusterServerIds: number[] }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [pendingMaint, setPendingMaint] = useState<Set<number>>(new Set())
+
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['servers', 'hypervisors'],
     queryFn: () => listServers({ max: 100, vmHypervisor: true }),
     staleTime: 30_000,
+  })
+
+  const maintenanceMutation = useMutation({
+    mutationFn: ({ id, enable }: { id: number; enable: boolean }) =>
+      enable ? enableMaintenanceMode(id) : leaveMaintenanceMode(id),
+    onMutate: ({ id }) => {
+      setPendingMaint((prev) => new Set([...prev, id]))
+    },
+    onSettled: (_data, _err, { id }) => {
+      setPendingMaint((prev) => { const next = new Set(prev); next.delete(id); return next })
+      queryClient.invalidateQueries({ queryKey: ['servers', 'hypervisors'] })
+      refetch()
+    },
   })
 
   const hosts = (data?.servers ?? [])
@@ -214,6 +230,7 @@ function ClusterHostsTab({ clusterServerIds }: { clusterServerIds: number[] }) {
                 <th>VMs</th>
                 <th>OS</th>
                 <th>Agent Version</th>
+                <th style={{ width: 120 }}>Maintenance</th>
               </tr>
             </thead>
             <tbody>
@@ -227,7 +244,7 @@ function ClusterHostsTab({ clusterServerIds }: { clusterServerIds: number[] }) {
                   <tr
                     key={server.id}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/hosts/${server.id}`)}
+                    onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; navigate(`/hosts/${server.id}`) }}
                   >
                     <td>
                       <div className="flex items-center gap-2">
@@ -279,6 +296,27 @@ function ClusterHostsTab({ clusterServerIds }: { clusterServerIds: number[] }) {
                     </td>
                     <td style={{ color: '#566278' }}>{server.osMorpheusType ?? server.osType ?? '—'}</td>
                     <td style={{ color: '#566278' }}>{server.agentVersion ?? '—'}</td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      {(() => {
+                        const inMaint = server.maintenanceMode || server.status === 'maintenance'
+                        const pending = pendingMaint.has(server.id)
+                        return (
+                          <button
+                            className={clsx('btn py-1 px-2 text-xs', inMaint ? 'btn-secondary' : 'btn-ghost')}
+                            style={inMaint ? { color: '#F59E0B', borderColor: 'rgba(245,158,11,0.3)' } : {}}
+                            disabled={pending}
+                            onClick={() => maintenanceMutation.mutate({ id: server.id, enable: !inMaint })}
+                            title={inMaint ? 'Leave maintenance mode' : 'Enter maintenance mode'}
+                          >
+                            {pending
+                              ? <Loader2 size={12} className="animate-spin" />
+                              : <Wrench size={12} style={{ color: inMaint ? '#F59E0B' : '#566278' }} />
+                            }
+                            {inMaint ? 'Active' : 'Enable'}
+                          </button>
+                        )
+                      })()}
+                    </td>
                   </tr>
                 )
               })}
@@ -312,11 +350,15 @@ function ClusterVMsTab({
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [moveOpen, setMoveOpen] = useState(false)
   const [targetHostId, setTargetHostId] = useState<number | null>(null)
-  const [placementStrategy, setPlacementStrategy] = useState<'auto' | 'failover' | 'pinned'>('auto')
   const [moveOps, setMoveOps] = useState<MoveOp[]>([])
   const [justDone, setJustDone] = useState(false)
   const moveOpsRef = useRef(moveOps)
   moveOpsRef.current = moveOps
+  const hasSeenRunningRef = useRef(false)
+
+  // Strategy modal
+  const [strategyOpen, setStrategyOpen] = useState(false)
+  const [newStrategy, setNewStrategy] = useState<'auto' | 'failover' | 'pinned'>('auto')
 
   // ── Instance list ──────────────────────────────────────────────────────────
   const { data: instData, isLoading: instLoading, isFetching, refetch } = useQuery({
@@ -346,7 +388,10 @@ function ClusterVMsTab({
 
   // ── Detect move completion ─────────────────────────────────────────────────
   useEffect(() => {
-    if (moveOps.length === 0) return
+    if (moveOps.length === 0) {
+      hasSeenRunningRef.current = false
+      return
+    }
     const movingServerIds = new Set(moveOps.map((m) => m.serverId))
     const running = (zoneProcesses?.processes ?? []).filter(
       (p) =>
@@ -354,8 +399,15 @@ function ClusterVMsTab({
         p.serverId != null &&
         movingServerIds.has(p.serverId),
     )
+    if (running.length > 0) hasSeenRunningRef.current = true
+
     const timedOut = moveOps.every((m) => Date.now() - m.startedAt > 120_000)
-    if ((zoneProcesses !== undefined && running.length === 0) || timedOut) {
+    // Grace period: don't mark done for first 8s (lets Morpheus register the task)
+    const gracePassed = moveOps.every((m) => Date.now() - m.startedAt > 8_000)
+    const processDone = zoneProcesses !== undefined && running.length === 0
+
+    if (((hasSeenRunningRef.current || gracePassed) && processDone) || timedOut) {
+      hasSeenRunningRef.current = false
       setMoveOps([])
       setJustDone(true)
       setTimeout(() => setJustDone(false), 3_000)
@@ -374,14 +426,15 @@ function ClusterVMsTab({
     .filter((inst) => !clusterZoneId || inst.cloud?.id === clusterZoneId)
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  // Build instanceId → first serverId map from vmServersData
-  // Servers don't directly expose instanceId, so we use the shared cache key
-  // instance.servers[0] is the serverId — build reverse map from the vm servers list
-  // (vmServersData servers each have containers which contain instance info)
-  // Simpler: just use instance.servers[0] directly on each row
   const vmServerIdMap = new Map<number, number>() // instanceId → serverId
   for (const inst of vms) {
     if (inst.servers?.[0]) vmServerIdMap.set(inst.id, inst.servers[0])
+  }
+
+  // serverId → placementStrategy
+  const placementStrategyMap = new Map<number, string>()
+  for (const s of vmServersData?.servers ?? []) {
+    if (s.placementStrategy) placementStrategyMap.set(s.id, s.placementStrategy)
   }
 
   // ── Mutations ──────────────────────────────────────────────────────────────
@@ -397,8 +450,8 @@ function ClusterVMsTab({
   })
 
   const moveMutation = useMutation({
-    mutationFn: async ({ serverIds, hostId, strategy }: { serverIds: number[]; hostId: number; strategy: 'auto' | 'failover' | 'pinned' }) => {
-      return Promise.all(serverIds.map((sid) => moveServer(sid, hostId, strategy)))
+    mutationFn: async ({ serverIds, hostId }: { serverIds: number[]; hostId: number }) => {
+      return Promise.all(serverIds.map((sid) => moveServer(sid, hostId)))
     },
     onSuccess: (_data, { serverIds, hostId }) => {
       const targetHost = clusterHosts.find((h) => h.id === hostId)
@@ -419,13 +472,25 @@ function ClusterVMsTab({
       setMoveOpen(false)
       setSelected(new Set())
       setTargetHostId(null)
-      setPlacementStrategy('auto')
+    },
+  })
+
+  const strategyMutation = useMutation({
+    mutationFn: async ({ serverIds, strategy }: { serverIds: number[]; strategy: 'auto' | 'failover' | 'pinned' }) => {
+      return Promise.all(serverIds.map((sid) => setServerPlacementStrategy(sid, strategy)))
+    },
+    onSuccess: () => {
+      setStrategyOpen(false)
+      setSelected(new Set())
+      queryClient.invalidateQueries({ queryKey: ['vm-servers', clusterZoneId] })
     },
   })
 
   const selectedServerIds = [...selected]
     .map((instId) => vmServerIdMap.get(instId))
     .filter((id): id is number => id != null)
+
+  const anyPinned = selectedServerIds.some((sid) => placementStrategyMap.get(sid) === 'pinned')
 
   const toggleSelect = (id: number) =>
     setSelected((prev) => {
@@ -501,26 +566,36 @@ function ClusterVMsTab({
       )}
 
       {/* ── Header / action bar ── */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div>
-          <h3 className="text-sm font-semibold text-white">Virtual Machines</h3>
-          <p className="text-xs mt-0.5" style={{ color: '#566278' }}>
-            {selected.size > 0
-              ? `${selected.size} of ${vms.length} selected`
-              : `${vms.length} VM${vms.length !== 1 ? 's' : ''} in cluster`}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 flex-wrap">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div>
+            <h3 className="text-sm font-semibold text-white">Virtual Machines</h3>
+            <p className="text-xs mt-0.5" style={{ color: '#566278' }}>
+              {selected.size > 0
+                ? `${selected.size} of ${vms.length} selected`
+                : `${vms.length} VM${vms.length !== 1 ? 's' : ''} in cluster`}
+            </p>
+          </div>
           {selected.size > 0 && (
-            <>
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 className="btn btn-secondary py-1.5 px-3"
                 onClick={() => setMoveOpen(true)}
-                disabled={!!moveOps.length || moveMutation.isPending}
-                title="Move selected VMs to another host"
+                disabled={!!moveOps.length || moveMutation.isPending || anyPinned}
+                title={anyPinned ? 'Cannot move pinned VMs — change strategy first' : 'Move selected VMs to another host'}
               >
                 <MoveRight size={13} />
                 Move ({selected.size})
+                {anyPinned && <span className="text-2xs ml-1" style={{ color: '#EF4444' }}>pinned</span>}
+              </button>
+              <button
+                className="btn btn-secondary py-1.5 px-3"
+                onClick={() => { setNewStrategy('auto'); setStrategyOpen(true) }}
+                disabled={strategyMutation.isPending}
+                title="Change placement strategy for selected VMs"
+              >
+                <Tag size={13} />
+                Strategy
               </button>
               <div className="w-px h-4 mx-0.5" style={{ background: '#1E2A45' }} />
               <button
@@ -544,12 +619,12 @@ function ClusterVMsTab({
               >
                 <RotateCcw size={12} />
               </button>
-            </>
+            </div>
           )}
-          <button className="btn btn-ghost py-1 px-2" onClick={() => { refetch(); refetchVmServers() }}>
-            <RefreshCw size={13} className={clsx(isFetching && 'animate-spin')} />
-          </button>
         </div>
+        <button className="btn btn-ghost py-1 px-2 shrink-0" onClick={() => { refetch(); refetchVmServers() }}>
+          <RefreshCw size={13} className={clsx(isFetching && 'animate-spin')} />
+        </button>
       </div>
 
       {vms.length === 0 ? (
@@ -574,6 +649,7 @@ function ClusterVMsTab({
                 <th>Name</th>
                 <th>Status</th>
                 <th>Host</th>
+                <th>Strategy</th>
                 <th>IP Address</th>
                 <th>Plan</th>
                 <th style={{ width: 80 }}>Actions</th>
@@ -584,6 +660,8 @@ function ClusterVMsTab({
                 const ip = inst.connectionInfo?.[0]?.ip ?? inst.containers?.[0]?.ip ?? inst.containers?.[0]?.internalIp
                 const sid = vmServerIdMap.get(inst.id)
                 const hostName = sid ? (hostMap.get(sid) ?? '—') : '—'
+                const strategy = sid ? (placementStrategyMap.get(sid) ?? null) : null
+                const isPinned = strategy === 'pinned'
                 const isMoving = moveOps.some((m) => m.instanceId === inst.id)
 
                 return (
@@ -614,6 +692,21 @@ function ClusterVMsTab({
                         <Server size={11} style={{ color: '#566278' }} />
                         {hostName}
                       </div>
+                    </td>
+                    <td>
+                      {strategy ? (
+                        <span
+                          className="text-2xs px-1.5 py-0.5 rounded capitalize"
+                          style={{
+                            background: isPinned ? 'rgba(239,68,68,0.15)' : 'rgba(86,98,120,0.2)',
+                            color: isPinned ? '#EF4444' : '#8B9AB0',
+                          }}
+                        >
+                          {strategy}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#566278' }}>—</span>
+                      )}
                     </td>
                     <td>
                       <span className="font-mono text-xs" style={{ color: '#8B9AB0' }}>{ip ?? '—'}</span>
@@ -652,6 +745,78 @@ function ClusterVMsTab({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Set Strategy Modal ── */}
+      {strategyOpen && (
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => !strategyMutation.isPending && setStrategyOpen(false)}
+        >
+          <div
+            className="rounded-xl p-6 space-y-5"
+            style={{ background: '#141C2E', border: '1px solid #1E2A45', width: 420 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Tag size={15} style={{ color: '#60A5FA' }} />
+                Set Placement Strategy
+              </h2>
+              <p className="text-xs mt-1" style={{ color: '#566278' }}>
+                Apply to {selected.size} selected VM{selected.size !== 1 ? 's' : ''}.
+              </p>
+            </div>
+            <div className="space-y-1 max-h-40 overflow-auto">
+              {vms.filter((v) => selected.has(v.id)).map((v) => {
+                const sid = vmServerIdMap.get(v.id)
+                const current = sid ? (placementStrategyMap.get(sid) ?? '—') : '—'
+                return (
+                  <div key={v.id} className="flex items-center gap-2 px-2 py-1.5 rounded" style={{ background: '#0D1117' }}>
+                    <Monitor size={12} style={{ color: '#00B388' }} />
+                    <span className="text-xs text-white flex-1">{v.name}</span>
+                    <span className="text-2xs" style={{ color: '#566278' }}>current: {current}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1.5" style={{ color: '#8B9AB0' }}>
+                New Strategy <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <select
+                className="input"
+                value={newStrategy}
+                onChange={(e) => setNewStrategy(e.target.value as 'auto' | 'failover' | 'pinned')}
+                disabled={strategyMutation.isPending}
+              >
+                <option value="auto">Auto — Morpheus chooses best host</option>
+                <option value="failover">Failover — prefer failover host</option>
+                <option value="pinned">Pinned — stay on current host</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setStrategyOpen(false)}
+                disabled={strategyMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={strategyMutation.isPending}
+                onClick={() => strategyMutation.mutate({ serverIds: selectedServerIds, strategy: newStrategy })}
+              >
+                {strategyMutation.isPending
+                  ? <><Loader2 size={13} className="animate-spin" /> Applying…</>
+                  : <><Tag size={13} /> Apply</>
+                }
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -710,23 +875,6 @@ function ClusterVMsTab({
               </select>
             </div>
 
-            {/* Placement strategy */}
-            <div>
-              <label className="block text-xs font-medium mb-1.5" style={{ color: '#8B9AB0' }}>
-                Placement Strategy
-              </label>
-              <select
-                className="input"
-                value={placementStrategy}
-                onChange={(e) => setPlacementStrategy(e.target.value as 'auto' | 'failover' | 'pinned')}
-                disabled={moveMutation.isPending}
-              >
-                <option value="auto">Auto</option>
-                <option value="failover">Failover</option>
-                <option value="pinned">Pinned</option>
-              </select>
-            </div>
-
             <div className="flex justify-end gap-2 pt-1">
               <button
                 className="btn btn-secondary"
@@ -738,7 +886,7 @@ function ClusterVMsTab({
               <button
                 className="btn btn-primary"
                 disabled={!targetHostId || moveMutation.isPending}
-                onClick={() => targetHostId && moveMutation.mutate({ serverIds: selectedServerIds, hostId: targetHostId, strategy: placementStrategy })}
+                onClick={() => targetHostId && moveMutation.mutate({ serverIds: selectedServerIds, hostId: targetHostId })}
               >
                 {moveMutation.isPending
                   ? <><Loader2 size={13} className="animate-spin" /> Initiating…</>

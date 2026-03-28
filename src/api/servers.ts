@@ -46,14 +46,34 @@ export async function restartServer(id: number) {
 export async function moveServer(
   serverId: number,
   targetHostId: number,
-  placementStrategy: 'auto' | 'failover' | 'pinned' = 'auto',
 ) {
   const resp = await apiClient.put(`/api/servers/${serverId}/placement`, {
     server: {
-      placementStrategy,
       preferredParentServer: { id: targetHostId },
     },
   })
+  return resp.data
+}
+
+export async function setServerPlacementStrategy(
+  serverId: number,
+  placementStrategy: 'auto' | 'failover' | 'pinned',
+) {
+  const resp = await apiClient.put(`/api/servers/${serverId}/placement`, {
+    server: { placementStrategy },
+  })
+  return resp.data
+}
+
+export async function enableMaintenanceMode(id: number, movePoweredOff = true) {
+  const resp = await apiClient.put(`/api/servers/${id}/maintenance`, {
+    server: { movePoweredOff },
+  })
+  return resp.data
+}
+
+export async function leaveMaintenanceMode(id: number) {
+  const resp = await apiClient.put(`/api/servers/${id}/leave-maintenance`)
   return resp.data
 }
 
