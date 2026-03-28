@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import toast from 'react-hot-toast'
 import { formatBytes, formatPercent } from '@/utils/format'
 import { StatusBadge } from '@/components/common/StatusDot'
 import type { Instance, ComputeServer } from '@/types/morpheus'
@@ -92,11 +91,6 @@ function DescriptionCard({ instance, vmServer }: { instance: Instance; vmServer?
       queryClient.invalidateQueries({ queryKey: ['instance', instance.id] })
       if (vmServer) queryClient.invalidateQueries({ queryKey: ['server', vmServer.id] })
       setEditing(false)
-      toast.success('Description saved')
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      toast.error(`Failed to save description: ${msg}`)
     },
   })
 
