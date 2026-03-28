@@ -22,8 +22,8 @@ export async function getServerHistory(
   params: { max?: number } = {},
 ): Promise<ProcessesResponse> {
   const resp = await apiClient.get<ProcessesResponse>(
-    `/api/servers/${id}/history`,
-    { params: { max: 50, ...params } },
+    `/api/processes`,
+    { params: { serverId: id, max: 50, ...params } },
   )
   return resp.data
 }

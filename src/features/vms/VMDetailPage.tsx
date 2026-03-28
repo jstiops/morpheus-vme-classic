@@ -208,7 +208,7 @@ export function VMDetailPage() {
       <div className="flex-1 overflow-auto p-4">
         {activeTab === 'summary' && <SummaryTab instance={instance} vmServer={vmServer} />}
         {activeTab === 'snapshots' && <SnapshotsTab instanceId={instanceId} />}
-        {activeTab === 'tasks' && <TasksTab instanceId={instanceId} />}
+        {activeTab === 'tasks' && vmServerId && <TasksTab serverId={vmServerId} />}
       </div>
     </div>
   )

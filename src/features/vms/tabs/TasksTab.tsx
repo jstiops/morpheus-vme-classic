@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
-import { getInstanceHistory } from '@/api/instances'
+import { getServerHistory } from '@/api/servers'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { CheckCircle, XCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
 
 interface Props {
-  instanceId: number
+  serverId: number
 }
 
 function statusIcon(status: string) {
@@ -33,10 +33,10 @@ function formatDuration(ms: number | null) {
   return `${Math.floor(ms / 60_000)}m ${Math.floor((ms % 60_000) / 1000)}s`
 }
 
-export function TasksTab({ instanceId }: Props) {
+export function TasksTab({ serverId }: Props) {
   const { data, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['instance-history', instanceId],
-    queryFn: () => getInstanceHistory(instanceId),
+    queryKey: ['server-history', serverId],
+    queryFn: () => getServerHistory(serverId),
     staleTime: 0,
     refetchInterval: (query) => {
       const processes = query.state.data?.processes ?? []
