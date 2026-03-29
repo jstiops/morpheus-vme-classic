@@ -130,12 +130,12 @@ mkdir -p "$STATIC_DIR"
 rsync -a --delete "$APP_DIR/dist/" "$STATIC_DIR/"
 mkdir -p "$(dirname "$STATIC_DIR")"
 
-# Write runtime config — lives outside dist/ so future rsync deploys don't
-# overwrite it. The app fetches /config.json on startup.
-cat > "$STATIC_DIR/config.json" <<EOF
+# Write runtime config one level above dist/ so rsync --delete never removes it.
+# The app fetches /config.json on startup; nginx serves it via alias.
+cat > "/var/www/${APP_NAME}/config.json" <<EOF
 {"vmeManagerUrl":"${VME_URL}"}
 EOF
-print_ok "Runtime config written to $STATIC_DIR/config.json"
+print_ok "Runtime config written to /var/www/${APP_NAME}/config.json"
 
 chown -R www-data:www-data "/var/www/${APP_NAME}"
 print_ok "Static files deployed to $STATIC_DIR"
