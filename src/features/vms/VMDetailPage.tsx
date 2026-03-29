@@ -12,6 +12,7 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { getInstance, startInstance, stopInstance, restartInstance, suspendInstance } from '@/api/instances'
+import { consoleUrl } from '@/utils/vmeManagerUrl'
 import { getServer } from '@/api/servers'
 import { StatusBadge } from '@/components/common/StatusDot'
 import { PageLoader } from '@/components/common/LoadingSpinner'
@@ -174,8 +175,7 @@ export function VMDetailPage() {
             disabled={!vmServer}
             onClick={() => {
               if (!vmServer) return
-              const url = `${window.location.origin}/terminal/server/${vmServer.id}?consoleMode=hypervisor`
-              window.open(url, '_blank', 'width=1024,height=768,noopener')
+              window.open(consoleUrl(vmServer.id), '_blank', 'width=1024,height=768,noopener')
             }}
             title="Open Console"
           >

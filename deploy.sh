@@ -129,6 +129,12 @@ print_step "Deploying static files"
 mkdir -p "$STATIC_DIR"
 rsync -a --delete "$APP_DIR/dist/" "$STATIC_DIR/"
 mkdir -p "$(dirname "$STATIC_DIR")"
+
+# Inject VME Manager URL into the built index.html so the frontend can open
+# console sessions directly on the VME Manager origin (session-cookie auth).
+sed -i "s|VME_MANAGER_URL_PLACEHOLDER|${VME_URL}|g" "$STATIC_DIR/index.html"
+print_ok "VME Manager URL injected into index.html"
+
 chown -R www-data:www-data "/var/www/${APP_NAME}"
 print_ok "Static files deployed to $STATIC_DIR"
 
