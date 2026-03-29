@@ -6,7 +6,7 @@ import { listInstances, deleteInstance } from '@/api/instances'
 import { listServers, getZoneHistory, startServer, stopServer, restartServer, moveServer, setServerPlacementStrategy, enableMaintenanceMode, leaveMaintenanceMode } from '@/api/servers'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusDot'
-import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2, Wrench, Tag, ChevronDown, Trash2 } from 'lucide-react'
+import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2, Wrench, Tag, ChevronDown, Trash2, Terminal } from 'lucide-react'
 import { formatBytes, formatPercent } from '@/utils/format'
 import { clsx } from 'clsx'
 
@@ -962,7 +962,7 @@ function ClusterVMsTab({
                 <th>Placement Strategy</th>
                 <th>IP Address</th>
                 <th>Plan</th>
-                <th style={{ width: 80 }}>Actions</th>
+                <th style={{ width: 100 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1050,6 +1050,18 @@ function ClusterVMsTab({
                           onClick={() => sid && powerMutation.mutate({ serverId: sid, instanceId: inst.id, action: 'restart' })}
                         >
                           <RotateCcw size={11} style={{ color: '#8B9AB0' }} />
+                        </button>
+                        <button
+                          className="btn btn-ghost p-1"
+                          title="Open Console"
+                          disabled={!sid}
+                          onClick={() => {
+                            if (!sid) return
+                            const url = `${window.location.origin}/terminal/server/${sid}?consoleMode=hypervisor`
+                            window.open(url, '_blank', 'width=1024,height=768,noopener')
+                          }}
+                        >
+                          <Terminal size={11} style={{ color: '#8B9AB0' }} />
                         </button>
                       </div>
                     </td>

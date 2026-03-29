@@ -171,9 +171,11 @@ export function VMDetailPage() {
 
           <button
             className="btn btn-secondary py-1.5 px-2"
+            disabled={!vmServer}
             onClick={() => {
-              const url = `/api/instances/${instanceId}/console`
-              window.open(url, '_blank', 'noopener')
+              if (!vmServer) return
+              const url = `${window.location.origin}/terminal/server/${vmServer.id}?consoleMode=hypervisor`
+              window.open(url, '_blank', 'width=1024,height=768,noopener')
             }}
             title="Open Console"
           >
