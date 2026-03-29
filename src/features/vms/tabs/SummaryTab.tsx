@@ -290,9 +290,6 @@ export function SummaryTab({ instance, vmServer }: Props) {
         ]}
       />
 
-      {/* Description */}
-      <DescriptionCard instance={instance} vmServer={vmServer} />
-
       {/* Network */}
       <div className="card">
         <div className="card-title flex items-center gap-1.5">
@@ -338,6 +335,9 @@ export function SummaryTab({ instance, vmServer }: Props) {
           <p className="text-xs" style={{ color: '#566278' }}>No network info</p>
         )}
       </div>
+
+      {/* Description */}
+      <DescriptionCard instance={instance} vmServer={vmServer} />
 
       {/* Tags */}
       {instance.tags && instance.tags.length > 0 && (
