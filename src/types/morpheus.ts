@@ -61,6 +61,7 @@ export interface Cluster {
   status: string
   enabled: boolean
   managed: boolean
+  autoRecoverPowerState?: boolean
   zone?: { id: number; name: string }
   type?: { id: number; name: string }
   layout?: { id: number; name: string; provisionTypeCode: string }
@@ -76,6 +77,12 @@ export interface Cluster {
     cpuUsage: number
   }
   workersCount?: number
+  config?: {
+    cpuModel?: string
+    dynamicPlacementMode?: string
+    vcpuMode?: string
+    powerPolicy?: string
+  }
   dateCreated: string
   lastUpdated: string
 }

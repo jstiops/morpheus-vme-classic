@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { listInstances } from '@/api/instances'
@@ -152,6 +152,7 @@ export function Sidebar() {
 
   const [activeTab, setActiveTab] = useState<TreeTab>('hc')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const clustersInitialized = useRef(false)
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -188,6 +189,13 @@ export function Sidebar() {
     retry: 0,
   })
 
+  // Auto-expand all clusters on first load
+  useEffect(() => {
+    if (clustersInitialized.current || !clustersData?.clusters?.length) return
+    clustersInitialized.current = true
+    setExpanded(new Set(clustersData.clusters.map((c) => `cluster-${c.id}`)))
+  }, [clustersData])
+
   const byName = <T extends { name: string }>(arr: T[]) =>
     [...arr].sort((a, b) => a.name.localeCompare(b.name))
 
@@ -209,9 +217,15 @@ export function Sidebar() {
     return ids
   }, [clusters])
 
-  // Standalone hypervisors: not in any cluster
+  // Standalone HVM hypervisors: not in any cluster, and not a vSphere/VMware host type
   const standaloneHosts = useMemo(
-    () => byName(allHypervisors.filter((h) => !clusterHostIds.has(h.id))),
+    () => byName(allHypervisors.filter((h) => {
+      if (clusterHostIds.has(h.id)) return false
+      const typeName = (h.computeServerType?.name ?? '').toLowerCase()
+      const typeCode = (h.computeServerType?.code ?? '').toLowerCase()
+      // Only include HVM hypervisors; exclude vSphere/VMware host types
+      return typeName.includes('hvm') || (!typeName.includes('vsphere') && !typeName.includes('vmware') && !typeCode.includes('vsphere') && !typeCode.includes('vmware'))
+    })),
     [allHypervisors, clusterHostIds],
   )
 
@@ -276,6 +290,29 @@ export function Sidebar() {
           {/* ── Hosts & Clusters tab ── */}
           {activeTab === 'hc' && (
             <>
+              {/* Standalone hosts (HVM only) — appear before clusters, collapsed by default */}
+              {standaloneHosts.length > 0 && (
+                <Section
+                  label="Standalone Hosts"
+                  icon={Server}
+                  count={standaloneHosts.length}
+                  expanded={expanded.has('standalone-hosts')}
+                  onToggle={() => toggle('standalone-hosts')}
+                  indent={0}
+                >
+                  {standaloneHosts.map((h) => (
+                    <TreeItem
+                      key={h.id}
+                      label={h.name}
+                      statusDot={hostStatusMap.get(h.id) ?? h.status}
+                      indent={1}
+                      active={p === `/hosts/${h.id}`}
+                      onClick={() => navigate(`/hosts/${h.id}`)}
+                    />
+                  ))}
+                </Section>
+              )}
+
               {clusters.map((cluster) => {
                 const clusterVms = byName(
                   instances.filter((i) => i.cloud?.id === cluster.zone?.id),
@@ -328,28 +365,6 @@ export function Sidebar() {
                 )
               })}
 
-              {/* Standalone hosts (not in any cluster) */}
-              {standaloneHosts.length > 0 && (
-                <Section
-                  label="Standalone Hosts"
-                  icon={Server}
-                  count={standaloneHosts.length}
-                  expanded={expanded.has('standalone-hosts')}
-                  onToggle={() => toggle('standalone-hosts')}
-                  indent={0}
-                >
-                  {standaloneHosts.map((h) => (
-                    <TreeItem
-                      key={h.id}
-                      label={h.name}
-                      statusDot={h.status}
-                      indent={1}
-                      active={p === `/hosts/${h.id}`}
-                      onClick={() => navigate(`/hosts/${h.id}`)}
-                    />
-                  ))}
-                </Section>
-              )}
             </>
           )}
 

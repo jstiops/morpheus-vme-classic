@@ -160,13 +160,32 @@ function ClusterSummaryTab({ cluster }: { cluster: Awaited<ReturnType<typeof get
             ['Type', cluster.type?.name],
             ['Layout', cluster.layout?.name],
             ['Hosts', String(cluster.workersCount ?? cluster.servers?.length ?? 0)],
+            ['CPU Model', cluster.config?.cpuModel],
+            ['Dynamic Placement', cluster.config?.dynamicPlacementMode
+              ? cluster.config.dynamicPlacementMode.charAt(0).toUpperCase() + cluster.config.dynamicPlacementMode.slice(1)
+              : undefined],
+            ['vCPU Placement', cluster.config?.vcpuMode],
+            ['Power Policy', cluster.config?.powerPolicy],
             ['Created', cluster.dateCreated ? new Date(cluster.dateCreated).toLocaleString() : undefined],
           ] as [string, string | undefined][]).filter(([, v]) => v).map(([label, value]) => (
             <div key={label} className="flex gap-2">
-              <dt className="text-xs shrink-0" style={{ color: '#566278', minWidth: 80 }}>{label}:</dt>
+              <dt className="text-xs shrink-0" style={{ color: '#566278', minWidth: 120 }}>{label}:</dt>
               <dd className="text-xs text-white">{value}</dd>
             </div>
           ))}
+        </dl>
+      </div>
+
+      {/* Settings */}
+      <div className="card">
+        <div className="card-title">Settings</div>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5 mt-2">
+          <div className="flex gap-2">
+            <dt className="text-xs shrink-0" style={{ color: '#566278', minWidth: 120 }}>Auto Power On VMs:</dt>
+            <dd className="text-xs" style={{ color: cluster.autoRecoverPowerState ? '#00B388' : '#6B7280' }}>
+              {cluster.autoRecoverPowerState ? 'Enabled' : 'Disabled'}
+            </dd>
+          </div>
         </dl>
       </div>
     </div>
