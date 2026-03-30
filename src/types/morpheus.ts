@@ -62,6 +62,7 @@ export interface Cluster {
   enabled: boolean
   managed: boolean
   autoRecoverPowerState?: boolean
+  clusterIdentifier?: string
   zone?: { id: number; name: string }
   type?: { id: number; name: string }
   layout?: { id: number; name: string; provisionTypeCode: string }
@@ -70,6 +71,7 @@ export interface Cluster {
     id: number
     name: string
     computeServerType?: { id: number; code: string; nodeType: string }
+    serverGroupMemberStatus?: string
   }>
   workerStats?: {
     usedMemory: number
@@ -83,21 +85,6 @@ export interface Cluster {
     vcpuMode?: string
     powerPolicy?: string
   }
-  // Pacemaker/HA status — present on HVM/GFS2 clusters
-  clusterName?: string
-  currentDc?: string
-  resourcesConfigured?: number
-  nodesConfigured?: number
-  maintenancing?: boolean
-  lastUpdate?: string
-  lastChange?: string
-  hostsOnline?: number
-  hostsStandby?: number
-  hostsPending?: number
-  hostsUnclean?: number
-  hostsOffline?: number
-  hostsFenced?: number
-  datastoreCount?: number
   dateCreated: string
   lastUpdated: string
 }
@@ -427,14 +414,15 @@ export interface DataStore {
   id: number
   name: string
   type: string
+  datastoreType?: { id: number; code: string; name: string }
   storageSize?: number
   freeSpace?: number
   online?: boolean
   active?: boolean
-  zone?: { id: number; name: string }
-  cluster?: { id: number; name: string }
-  imageTarget?: boolean
+  defaultStore?: boolean
   heartbeatTarget?: boolean
+  checkpointTarget?: boolean
+  zone?: { id: number; name: string }
 }
 
 export interface DataStoresResponse {

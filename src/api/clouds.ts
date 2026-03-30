@@ -35,10 +35,7 @@ export async function listClusters(
 
 export async function getCluster(id: number): Promise<Cluster> {
   const resp = await apiClient.get<{ cluster: Cluster }>(`/api/clusters/${id}`)
-  const c = resp.data.cluster
-  console.log('[DEBUG] cluster.config', JSON.stringify(c.config, null, 2))
-  console.log('[DEBUG] cluster.servers', JSON.stringify((c as any).servers, null, 2))
-  return c
+  return resp.data.cluster
 }
 
 export async function listServerGroups(
@@ -90,10 +87,7 @@ export async function listDataStores(params: { max?: number } = {}): Promise<Dat
   const resp = await apiClient.get<DataStoresResponse>('/api/data-stores', {
     params: { max: 100, ...params },
   })
-  // Log the GFS2 datastore and first datastore in full
-  const stores = resp.data.datastores ?? []
-  stores.forEach(ds => console.log(`[DEBUG] datastore[${ds.name}]`, JSON.stringify(ds, null, 2)))
-  return stores
+  return resp.data.datastores ?? []
 }
 
 export async function listResourcePools(zoneId: number): Promise<ResourcePool[]> {

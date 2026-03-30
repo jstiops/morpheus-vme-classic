@@ -217,14 +217,15 @@ export function Sidebar() {
     return ids
   }, [clusters])
 
-  // Standalone HVM hypervisors: not in any cluster, and not a vSphere/VMware host type
+  // Standalone HVM hypervisors: not in any cluster, and not a vSphere/VMware/ESX host type
   const standaloneHosts = useMemo(
     () => byName(allHypervisors.filter((h) => {
       if (clusterHostIds.has(h.id)) return false
-      const typeName = (h.computeServerType?.name ?? '').toLowerCase()
-      const typeCode = (h.computeServerType?.code ?? '').toLowerCase()
-      // Only include HVM hypervisors; exclude vSphere/VMware host types
-      return typeName.includes('hvm') || (!typeName.includes('vsphere') && !typeName.includes('vmware') && !typeCode.includes('vsphere') && !typeCode.includes('vmware'))
+      const code = (h.computeServerType?.code ?? '').toLowerCase()
+      const name = (h.computeServerType?.name ?? '').toLowerCase()
+      // Exclude vSphere/VMware/ESX hypervisor types
+      return !code.includes('vmware') && !code.includes('vsphere') && !code.includes('esx')
+        && !name.includes('vmware') && !name.includes('vsphere')
     })),
     [allHypervisors, clusterHostIds],
   )

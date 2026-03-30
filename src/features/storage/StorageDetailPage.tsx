@@ -45,11 +45,8 @@ export function StorageDetailPage() {
   const storUsed = storMax > 0 ? storMax - storFree : 0
   const storPct = storMax > 0 ? (storUsed / storMax) * 100 : 0
 
-  const typeLabel =
-    ds.type === 'directory' ? 'Directory Pool'
-    : ds.type === 'generic' ? 'Generic'
-    : ds.type === 'vmfs' ? 'VMFS'
-    : ds.type
+  const typeLabel = ds.datastoreType?.name
+    ?? (ds.type === 'vmfs' ? 'VMFS' : ds.type)
 
   return (
     <div className="flex flex-col h-full">
@@ -132,11 +129,11 @@ export function StorageDetailPage() {
                   <dd className="text-xs text-white">{value}</dd>
                 </div>
               ))}
-              {ds.imageTarget != null && (
+              {ds.defaultStore != null && (
                 <div className="flex gap-2">
-                  <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>Image Target:</dt>
-                  <dd className="text-xs" style={{ color: ds.imageTarget ? '#00B388' : '#6B7280' }}>
-                    {ds.imageTarget ? 'Yes' : 'No'}
+                  <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>Default:</dt>
+                  <dd className="text-xs" style={{ color: ds.defaultStore ? '#00B388' : '#6B7280' }}>
+                    {ds.defaultStore ? 'Yes' : 'No'}
                   </dd>
                 </div>
               )}
@@ -145,6 +142,14 @@ export function StorageDetailPage() {
                   <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>Heartbeat:</dt>
                   <dd className="text-xs" style={{ color: ds.heartbeatTarget ? '#00B388' : '#6B7280' }}>
                     {ds.heartbeatTarget ? 'Yes' : 'No'}
+                  </dd>
+                </div>
+              )}
+              {ds.checkpointTarget != null && (
+                <div className="flex gap-2">
+                  <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>Checkpoint:</dt>
+                  <dd className="text-xs" style={{ color: ds.checkpointTarget ? '#00B388' : '#6B7280' }}>
+                    {ds.checkpointTarget ? 'Yes' : 'No'}
                   </dd>
                 </div>
               )}

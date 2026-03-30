@@ -189,48 +189,50 @@ function ClusterSummaryTab({ cluster }: { cluster: Awaited<ReturnType<typeof get
         </dl>
       </div>
 
-      {/* Pacemaker — only shown when the API returns pacemaker fields */}
-      {(cluster.clusterName ?? cluster.currentDc ?? cluster.nodesConfigured != null) && (
-        <div className="card">
-          <div className="card-title">Pacemaker</div>
+      {/* Pacemaker — only shown on HVM/GFS2 clusters that have a clusterIdentifier */}
+      {cluster.clusterIdentifier && (() => {
+        const servers = cluster.servers ?? []
+        const statusColor = (s: string) =>
+          s === 'online' ? '#00B388' : s === 'standby' ? '#F59E0B' : s === 'offline' ? '#6B7280' : '#EF4444'
+        const counts = servers.reduce<Record<string, number>>((acc, s) => {
+          const k = (s.serverGroupMemberStatus ?? 'unknown').toLowerCase()
+          acc[k] = (acc[k] ?? 0) + 1
+          return acc
+        }, {})
+        return (
+          <div className="card">
+            <div className="card-title">Pacemaker</div>
 
-          {/* Node state summary bar */}
-          {cluster.hostsOnline != null && (
-            <div className="flex gap-4 mt-2 mb-3">
-              {([
-                ['Online',   cluster.hostsOnline,   '#00B388'],
-                ['Standby',  cluster.hostsStandby,  '#F59E0B'],
-                ['Pending',  cluster.hostsPending,  '#60A5FA'],
-                ['Unclean',  cluster.hostsUnclean,  '#EF4444'],
-                ['Offline',  cluster.hostsOffline,  '#6B7280'],
-                ['Fenced',   cluster.hostsFenced,   '#EF4444'],
-              ] as [string, number | undefined, string][]).map(([label, count, color]) => (
-                <div key={label} className="text-center">
-                  <div className="text-sm font-semibold" style={{ color }}>{count ?? 0}</div>
-                  <div className="text-2xs mt-0.5" style={{ color: '#566278' }}>{label}</div>
+            {/* Per-status count bar */}
+            <div className="flex gap-5 mt-2 mb-3">
+              {Object.entries(counts).map(([status, count]) => (
+                <div key={status} className="text-center">
+                  <div className="text-sm font-semibold" style={{ color: statusColor(status) }}>{count}</div>
+                  <div className="text-2xs mt-0.5 capitalize" style={{ color: '#566278' }}>{status}</div>
                 </div>
               ))}
             </div>
-          )}
 
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5">
-            {([
-              ['Cluster Name',          cluster.clusterName],
-              ['Current DC',            cluster.currentDc],
-              ['Nodes Configured',      cluster.nodesConfigured != null ? String(cluster.nodesConfigured) : undefined],
-              ['Resources Configured',  cluster.resourcesConfigured != null ? String(cluster.resourcesConfigured) : undefined],
-              ['Maintenancing',         cluster.maintenancing != null ? (cluster.maintenancing ? 'Yes' : 'No') : undefined],
-              ['Last Update',           cluster.lastUpdate],
-              ['Last Change',           cluster.lastChange],
-            ] as [string, string | undefined][]).filter(([, v]) => v != null).map(([label, value]) => (
-              <div key={label} className="flex gap-2">
-                <dt className="text-xs shrink-0" style={{ color: '#566278', minWidth: 140 }}>{label}:</dt>
-                <dd className="text-xs text-white">{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
+            {/* Per-host member status */}
+            <div className="space-y-1">
+              {[...servers].sort((a, b) => a.name.localeCompare(b.name)).map((s) => {
+                const ms = (s.serverGroupMemberStatus ?? 'unknown').toLowerCase()
+                return (
+                  <div key={s.id} className="flex items-center gap-3 px-2 py-1.5 rounded" style={{ background: '#0D1117' }}>
+                    <span className="text-xs text-white flex-1">{s.name}</span>
+                    <span className="text-2xs capitalize" style={{ color: statusColor(ms) }}>{ms}</span>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="flex gap-2 mt-3">
+              <dt className="text-xs shrink-0" style={{ color: '#566278', minWidth: 120 }}>Cluster Identifier:</dt>
+              <dd className="text-xs" style={{ color: '#8B9AB0' }}>{cluster.clusterIdentifier}</dd>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
