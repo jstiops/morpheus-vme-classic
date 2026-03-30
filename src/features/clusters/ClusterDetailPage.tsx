@@ -6,9 +6,8 @@ import { listInstances, deleteInstance } from '@/api/instances'
 import { listServers, getZoneHistory, startServer, stopServer, restartServer, moveServer, setServerPlacementStrategy, enableMaintenanceMode, leaveMaintenanceMode } from '@/api/servers'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusDot'
-import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2, Wrench, Tag, ChevronDown, Trash2, Terminal } from 'lucide-react'
+import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2, Wrench, Tag, ChevronDown, Trash2 } from 'lucide-react'
 import { formatBytes, formatPercent } from '@/utils/format'
-import { consoleUrl } from '@/utils/vmeManagerUrl'
 import { clsx } from 'clsx'
 
 const TABS = [
@@ -1042,7 +1041,6 @@ function ClusterVMsTab({
                 <th>Placement Strategy</th>
                 <th>IP Address</th>
                 <th>Plan</th>
-                <th style={{ width: 100 }}>Actions</th>
               </tr>
               <tr>
                 <th />
@@ -1082,7 +1080,7 @@ function ClusterVMsTab({
                     }}
                   />
                 </th>
-                <th /><th /><th /><th />
+                <th /><th /><th />
               </tr>
             </thead>
             <tbody>
@@ -1150,45 +1148,6 @@ function ClusterVMsTab({
                       <span className="font-mono text-xs" style={{ color: '#8B9AB0' }}>{ip ?? '—'}</span>
                     </td>
                     <td style={{ color: '#8B9AB0' }}>{inst.plan?.name ?? '—'}</td>
-                    <td onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-0.5">
-                        <button
-                          className="btn btn-ghost p-1"
-                          title="Power On"
-                          disabled={!sid || isBusy || instStatus === 'running'}
-                          onClick={() => sid && powerMutation.mutate({ serverId: sid, instanceId: inst.id, action: 'start' })}
-                        >
-                          <Play size={11} style={{ color: instStatus === 'running' ? '#566278' : '#00B388' }} />
-                        </button>
-                        <button
-                          className="btn btn-ghost p-1"
-                          title="Power Off"
-                          disabled={!sid || isBusy || instStatus === 'stopped'}
-                          onClick={() => sid && powerMutation.mutate({ serverId: sid, instanceId: inst.id, action: 'stop' })}
-                        >
-                          <Square size={11} style={{ color: '#8B9AB0' }} />
-                        </button>
-                        <button
-                          className="btn btn-ghost p-1"
-                          title="Restart"
-                          disabled={!sid || isBusy || instStatus === 'stopped'}
-                          onClick={() => sid && powerMutation.mutate({ serverId: sid, instanceId: inst.id, action: 'restart' })}
-                        >
-                          <RotateCcw size={11} style={{ color: '#8B9AB0' }} />
-                        </button>
-                        <button
-                          className="btn btn-ghost p-1"
-                          title="Open Console"
-                          disabled={!sid}
-                          onClick={() => {
-                            if (!sid) return
-                            window.open(consoleUrl(sid), '_blank', 'width=1024,height=768,noopener')
-                          }}
-                        >
-                          <Terminal size={11} style={{ color: '#8B9AB0' }} />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 )
               })}
