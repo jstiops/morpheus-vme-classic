@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { listDataStores } from '@/api/clouds'
+import { listDataStores, listClusters } from '@/api/clouds'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { ArrowLeft, HardDrive } from 'lucide-react'
 import { formatBytes } from '@/utils/format'
@@ -18,9 +18,20 @@ export function StorageDetailPage() {
     retry: 0,
   })
 
+  const { data: clustersData } = useQuery({
+    queryKey: ['clusters'],
+    queryFn: () => listClusters(),
+    staleTime: 120_000,
+    retry: 0,
+  })
+
   if (isLoading) return <PageLoader />
 
   const ds = datastores?.find((d) => d.id === dsId)
+
+  // Cluster name: prefer direct reference on datastore; fall back to zone match
+  const clusterName = ds?.cluster?.name
+    ?? clustersData?.clusters?.find((c) => c.zone?.id === ds?.zone?.id)?.name
 
   if (!ds) return (
     <div className="empty-state">
@@ -110,17 +121,33 @@ export function StorageDetailPage() {
           <div className="card">
             <div className="card-title">Properties</div>
             <dl className="space-y-2.5 mt-2">
-              {[
-                ['Name', ds.name],
-                ['Type', typeLabel],
-                ['Cloud', ds.zone?.name],
-                ['Status', ds.online !== false ? 'Online' : 'Offline'],
-              ].map(([label, value]) => (
-                <div key={label as string} className="flex gap-2">
+              {([
+                ['Name',    ds.name],
+                ['Type',    typeLabel],
+                ['Cluster', clusterName],
+                ['Status',  ds.online !== false ? 'Online' : 'Offline'],
+              ] as [string, string | undefined][]).filter(([, v]) => v).map(([label, value]) => (
+                <div key={label} className="flex gap-2">
                   <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>{label}:</dt>
-                  <dd className="text-xs text-white">{value as string}</dd>
+                  <dd className="text-xs text-white">{value}</dd>
                 </div>
               ))}
+              {ds.imageTarget != null && (
+                <div className="flex gap-2">
+                  <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>Image Target:</dt>
+                  <dd className="text-xs" style={{ color: ds.imageTarget ? '#00B388' : '#6B7280' }}>
+                    {ds.imageTarget ? 'Yes' : 'No'}
+                  </dd>
+                </div>
+              )}
+              {ds.heartbeatTarget != null && (
+                <div className="flex gap-2">
+                  <dt className="text-xs shrink-0" style={{ color: '#566278', width: 70 }}>Heartbeat:</dt>
+                  <dd className="text-xs" style={{ color: ds.heartbeatTarget ? '#00B388' : '#6B7280' }}>
+                    {ds.heartbeatTarget ? 'Yes' : 'No'}
+                  </dd>
+                </div>
+              )}
             </dl>
           </div>
         </div>

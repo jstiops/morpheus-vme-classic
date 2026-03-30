@@ -83,6 +83,21 @@ export interface Cluster {
     vcpuMode?: string
     powerPolicy?: string
   }
+  // Pacemaker/HA status — present on HVM/GFS2 clusters
+  clusterName?: string
+  currentDc?: string
+  resourcesConfigured?: number
+  nodesConfigured?: number
+  maintenancing?: boolean
+  lastUpdate?: string
+  lastChange?: string
+  hostsOnline?: number
+  hostsStandby?: number
+  hostsPending?: number
+  hostsUnclean?: number
+  hostsOffline?: number
+  hostsFenced?: number
+  datastoreCount?: number
   dateCreated: string
   lastUpdated: string
 }
@@ -417,6 +432,9 @@ export interface DataStore {
   online?: boolean
   active?: boolean
   zone?: { id: number; name: string }
+  cluster?: { id: number; name: string }
+  imageTarget?: boolean
+  heartbeatTarget?: boolean
 }
 
 export interface DataStoresResponse {

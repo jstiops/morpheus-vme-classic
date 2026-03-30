@@ -188,6 +188,49 @@ function ClusterSummaryTab({ cluster }: { cluster: Awaited<ReturnType<typeof get
           </div>
         </dl>
       </div>
+
+      {/* Pacemaker — only shown when the API returns pacemaker fields */}
+      {(cluster.clusterName ?? cluster.currentDc ?? cluster.nodesConfigured != null) && (
+        <div className="card">
+          <div className="card-title">Pacemaker</div>
+
+          {/* Node state summary bar */}
+          {cluster.hostsOnline != null && (
+            <div className="flex gap-4 mt-2 mb-3">
+              {([
+                ['Online',   cluster.hostsOnline,   '#00B388'],
+                ['Standby',  cluster.hostsStandby,  '#F59E0B'],
+                ['Pending',  cluster.hostsPending,  '#60A5FA'],
+                ['Unclean',  cluster.hostsUnclean,  '#EF4444'],
+                ['Offline',  cluster.hostsOffline,  '#6B7280'],
+                ['Fenced',   cluster.hostsFenced,   '#EF4444'],
+              ] as [string, number | undefined, string][]).map(([label, count, color]) => (
+                <div key={label} className="text-center">
+                  <div className="text-sm font-semibold" style={{ color }}>{count ?? 0}</div>
+                  <div className="text-2xs mt-0.5" style={{ color: '#566278' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+            {([
+              ['Cluster Name',          cluster.clusterName],
+              ['Current DC',            cluster.currentDc],
+              ['Nodes Configured',      cluster.nodesConfigured != null ? String(cluster.nodesConfigured) : undefined],
+              ['Resources Configured',  cluster.resourcesConfigured != null ? String(cluster.resourcesConfigured) : undefined],
+              ['Maintenancing',         cluster.maintenancing != null ? (cluster.maintenancing ? 'Yes' : 'No') : undefined],
+              ['Last Update',           cluster.lastUpdate],
+              ['Last Change',           cluster.lastChange],
+            ] as [string, string | undefined][]).filter(([, v]) => v != null).map(([label, value]) => (
+              <div key={label} className="flex gap-2">
+                <dt className="text-xs shrink-0" style={{ color: '#566278', minWidth: 140 }}>{label}:</dt>
+                <dd className="text-xs text-white">{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
     </div>
   )
 }
@@ -1014,7 +1057,12 @@ function ClusterVMsTab({
                       <div className="flex items-center gap-2">
                         {isBusy
                           ? <Loader2 size={12} className="animate-spin" style={{ color: '#60A5FA' }} />
-                          : <Monitor size={12} style={{ color: '#00B388' }} />
+                          : <Monitor size={12} style={{ color:
+                              instStatus === 'running' ? '#00B388'
+                              : instStatus === 'failed' ? '#EF4444'
+                              : instStatus === 'suspended' || instStatus === 'warning' ? '#F59E0B'
+                              : '#6B7280'
+                            }} />
                         }
                         <span className="font-medium" style={{ color: '#60A5FA' }}>{inst.name}</span>
                       </div>
