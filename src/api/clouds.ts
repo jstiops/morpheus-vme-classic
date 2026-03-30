@@ -35,6 +35,7 @@ export async function listClusters(
 
 export async function getCluster(id: number): Promise<Cluster> {
   const resp = await apiClient.get<{ cluster: Cluster }>(`/api/clusters/${id}`)
+  console.log('[DEBUG] cluster raw response', resp.data.cluster)
   return resp.data.cluster
 }
 
@@ -87,6 +88,7 @@ export async function listDataStores(params: { max?: number } = {}): Promise<Dat
   const resp = await apiClient.get<DataStoresResponse>('/api/data-stores', {
     params: { max: 100, ...params },
   })
+  console.log('[DEBUG] datastores raw response', resp.data.datastores)
   return resp.data.datastores ?? []
 }
 
