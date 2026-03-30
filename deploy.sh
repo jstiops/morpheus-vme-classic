@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # =============================================================================
 # HPE Morpheus VME Classic — Deploy Script for Ubuntu 24.04
-# Usage:  sudo bash deploy.sh
+# Usage:  sudo bash deploy.sh           (fresh install)
+#         sudo bash deploy.sh --update  (pull + rebuild only, keeps TLS cert)
 # =============================================================================
 set -euo pipefail
 
@@ -25,12 +26,97 @@ print_ok()   { echo -e "${GREEN}  ✓ $1${NC}"; }
 print_warn() { echo -e "${YELLOW}  ⚠ $1${NC}"; }
 print_err()  { echo -e "${RED}  ✗ $1${NC}" >&2; }
 
+# ── Parse flags ───────────────────────────────────────────────────────────────
+UPDATE_MODE=false
+for arg in "$@"; do
+    case "$arg" in
+        --update) UPDATE_MODE=true ;;
+        --help|-h)
+            echo "Usage: sudo bash deploy.sh [--update]"
+            echo ""
+            echo "  (no flag)   Full install: dependencies, TLS cert, build, nginx, firewall"
+            echo "  --update    Pull latest code and rebuild only — skips cert/nginx/firewall"
+            exit 0
+            ;;
+    esac
+done
+
 # ── Check root ────────────────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
     print_err "Please run as root: sudo bash deploy.sh"
     exit 1
 fi
 
+SERVER_IP=$(hostname -I | awk '{print $1}')
+SERVER_HOST=$(hostname -f 2>/dev/null || echo "localhost")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UPDATE MODE — pull + rebuild + redeploy only, TLS cert and nginx untouched
+# ══════════════════════════════════════════════════════════════════════════════
+if [[ "$UPDATE_MODE" == true ]]; then
+    echo ""
+    echo "╔═══════════════════════════════════════════════════════════════╗"
+    echo "║      HPE Morpheus VME Classic — Update                        ║"
+    echo "╚═══════════════════════════════════════════════════════════════╝"
+
+    if [[ ! -d "$APP_DIR/.git" ]]; then
+        print_err "Application not found at $APP_DIR. Run without --update for a fresh install."
+        exit 1
+    fi
+
+    # Read existing VME URL from config.json so the user isn't prompted again
+    CONFIG_FILE="/var/www/${APP_NAME}/config.json"
+    VME_URL=""
+    if [[ -f "$CONFIG_FILE" ]]; then
+        VME_URL=$(python3 -c "import json,sys; print(json.load(open('$CONFIG_FILE'))['vmeManagerUrl'])" 2>/dev/null || true)
+    fi
+    if [[ -z "${VME_URL}" ]]; then
+        print_warn "Could not read existing VME URL from $CONFIG_FILE"
+        read -rp "  Enter your VME Manager URL (e.g. https://morpheus.example.com): " VME_URL
+        VME_URL="${VME_URL%/}"
+    fi
+    print_ok "VME URL: $VME_URL"
+
+    print_step "Pulling latest source"
+    git -C "$APP_DIR" pull --ff-only
+    print_ok "Source updated"
+
+    print_step "Installing npm dependencies"
+    cd "$APP_DIR"
+    npm install --no-audit --no-fund
+    print_ok "Dependencies up to date"
+
+    print_step "Building production bundle"
+    npm run build 2>&1
+    print_ok "Build complete"
+
+    print_step "Deploying static files"
+    mkdir -p "$STATIC_DIR"
+    rsync -a --delete "$APP_DIR/dist/" "$STATIC_DIR/"
+    # Rewrite config.json (lives outside dist/ so rsync --delete never removes it)
+    cat > "/var/www/${APP_NAME}/config.json" <<EOF
+{"vmeManagerUrl":"${VME_URL}"}
+EOF
+    chown -R www-data:www-data "/var/www/${APP_NAME}"
+    print_ok "Static files deployed to $STATIC_DIR"
+
+    print_step "Reloading Nginx"
+    systemctl reload nginx
+    print_ok "Nginx reloaded"
+
+    echo ""
+    echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗"
+    echo -e "║  ✅  HPE Morpheus VME Classic updated successfully!           ║"
+    echo -e "╚═══════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  ${CYAN}Dashboard:${NC}   https://${SERVER_IP}/"
+    echo ""
+    exit 0
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FULL INSTALL MODE
+# ══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo "╔═══════════════════════════════════════════════════════════════╗"
 echo "║      HPE Morpheus VME Classic — Deployment Script             ║"
@@ -78,6 +164,8 @@ fi
 if ! command -v git &>/dev/null; then
     apt-get install -y -qq git
     print_ok "git installed"
+else
+    print_ok "git already installed"
 fi
 
 if ! command -v ufw &>/dev/null; then
@@ -87,8 +175,6 @@ fi
 # ── Step 3: Generate self-signed TLS certificate ──────────────────────────────
 print_step "Generating self-signed TLS certificate (10-year validity)"
 mkdir -p "$SSL_DIR"
-SERVER_IP=$(hostname -I | awk '{print $1}')
-SERVER_HOST=$(hostname -f 2>/dev/null || echo "localhost")
 
 openssl req -x509 -nodes -days 3650 \
     -newkey rsa:2048 \
@@ -131,7 +217,7 @@ rsync -a --delete "$APP_DIR/dist/" "$STATIC_DIR/"
 mkdir -p "$(dirname "$STATIC_DIR")"
 
 # Write runtime config one level above dist/ so rsync --delete never removes it.
-# The app fetches /config.json on startup; nginx serves it via alias.
+# The app fetches /config.json on startup; nginx serves it via root directive.
 cat > "/var/www/${APP_NAME}/config.json" <<EOF
 {"vmeManagerUrl":"${VME_URL}"}
 EOF
@@ -180,6 +266,9 @@ echo "  ⚠  The certificate is self-signed. Browsers will show a security"
 echo "     warning — click 'Advanced → Proceed' to continue."
 echo "     To trust it system-wide, import ${SSL_DIR}/cert.pem into your"
 echo "     browser or OS certificate store."
+echo ""
+echo "  To update the application in future, run:"
+echo "    sudo bash /opt/${APP_NAME}/deploy.sh --update"
 echo ""
 echo "  Open a browser and navigate to https://${SERVER_IP}/"
 echo "  Sign in with your Morpheus username and password."
