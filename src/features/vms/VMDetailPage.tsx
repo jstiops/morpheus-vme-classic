@@ -56,11 +56,19 @@ export function VMDetailPage() {
   const [moveOp, setMoveOp] = useState<{ targetHostName: string; startedAt: number } | null>(null)
   const [moveJustDone, setMoveJustDone] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
+  const [ejectJustDone, setEjectJustDone] = useState(false)
+  const [ejectError, setEjectError] = useState(false)
 
   const ejectMutation = useMutation({
     mutationFn: () => ejectInstance(instanceId),
-    onSuccess: () => toast.success('CD-ROM ejected'),
-    onError: () => toast.error('Eject failed'),
+    onSuccess: () => {
+      setEjectJustDone(true)
+      setTimeout(() => setEjectJustDone(false), 3_000)
+    },
+    onError: () => {
+      setEjectError(true)
+      setTimeout(() => setEjectError(false), 4_000)
+    },
   })
 
   // Fetch the VM's own server record — has parentServer (= hypervisor) and interfaces (= networks)
@@ -314,6 +322,25 @@ export function VMDetailPage() {
         <div className="flex items-center gap-3 px-4 py-2" style={{ background: 'rgba(0,179,136,0.08)', borderBottom: '1px solid rgba(0,179,136,0.2)' }}>
           <CheckCircle2 size={14} style={{ color: '#00B388' }} />
           <p className="text-xs font-medium" style={{ color: '#00B388' }}>Migration completed</p>
+        </div>
+      )}
+
+      {/* Eject banners */}
+      {ejectMutation.isPending && (
+        <div className="flex items-center gap-3 px-4 py-3" style={{ background: 'rgba(96,165,250,0.08)', borderBottom: '1px solid rgba(96,165,250,0.2)' }}>
+          <Loader2 size={15} className="animate-spin shrink-0" style={{ color: '#60A5FA' }} />
+          <p className="text-xs" style={{ color: '#60A5FA' }}>Ejecting CD-ROM…</p>
+        </div>
+      )}
+      {ejectJustDone && !ejectMutation.isPending && (
+        <div className="flex items-center gap-3 px-4 py-2" style={{ background: 'rgba(0,179,136,0.08)', borderBottom: '1px solid rgba(0,179,136,0.2)' }}>
+          <CheckCircle2 size={14} style={{ color: '#00B388' }} />
+          <p className="text-xs font-medium" style={{ color: '#00B388' }}>CD-ROM ejected</p>
+        </div>
+      )}
+      {ejectError && !ejectMutation.isPending && (
+        <div className="flex items-center gap-3 px-4 py-2" style={{ background: 'rgba(239,68,68,0.08)', borderBottom: '1px solid rgba(239,68,68,0.2)' }}>
+          <p className="text-xs font-medium" style={{ color: '#EF4444' }}>Eject failed — check VME Manager</p>
         </div>
       )}
 
