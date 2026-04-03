@@ -216,6 +216,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .status-dot.running      { background: #00B388; box-shadow: 0 0 6px rgba(0,179,136,0.5); }
 .status-dot.ok           { background: #00B388; box-shadow: 0 0 6px rgba(0,179,136,0.5); }
+.status-dot.provisioned  { background: #00B388; box-shadow: 0 0 6px rgba(0,179,136,0.5); }
 .status-dot.stopped      { background: #6B7280; }
 .status-dot.unknown      { background: #6B7280; }
 .status-dot.suspended    { background: #F59E0B; }

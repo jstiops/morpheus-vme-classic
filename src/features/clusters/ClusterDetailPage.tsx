@@ -304,7 +304,7 @@ function ClusterHostsTab({ clusterServerIds, clusterZoneId }: { clusterServerIds
   if (isLoading) return <PageLoader />
 
   return (
-    <div className="max-w-5xl space-y-3">
+    <div className="space-y-3">
       {/* ── Maintenance progress banner ── */}
       {maintOp && (
         <div
@@ -355,7 +355,7 @@ function ClusterHostsTab({ clusterServerIds, clusterZoneId }: { clusterServerIds
           <p className="text-sm" style={{ color: '#8B9AB0' }}>No hosts found</p>
         </div>
       ) : (
-        <div className="rounded-lg overflow-hidden" style={{ border: '1px solid #1E2A45' }}>
+        <div className="rounded-lg overflow-x-auto" style={{ border: '1px solid #1E2A45' }}>
           <table className="data-table">
             <thead>
               <tr>
