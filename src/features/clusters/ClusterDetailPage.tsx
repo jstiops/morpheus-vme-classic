@@ -6,7 +6,7 @@ import { listInstances, deleteInstance } from '@/api/instances'
 import { listServers, getZoneHistory, startServer, stopServer, restartServer, moveServer, setServerPlacementStrategy, enableMaintenanceMode, leaveMaintenanceMode } from '@/api/servers'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { StatusBadge } from '@/components/common/StatusDot'
-import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2, Wrench, Tag, ChevronDown, Trash2 } from 'lucide-react'
+import { ArrowLeft, Layers, Server, Monitor, RefreshCw, CheckCircle, XCircle, Clock, AlertCircle, Play, Square, RotateCcw, MoveRight, Loader2, CheckCircle2, Wrench, Tag, ChevronDown, Trash2, Disc } from 'lucide-react'
 import { formatBytes, formatPercent } from '@/utils/format'
 import { clsx } from 'clsx'
 
@@ -657,6 +657,7 @@ function ClusterVMsTab({
   const [filterName, setFilterName] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterHost, setFilterHost] = useState('')
+  const [filterCdrom, setFilterCdrom] = useState<'' | 'mounted' | 'none'>('')
 
   // ── Instance list ──────────────────────────────────────────────────────────
   const busy = moveOps.length > 0 || powerOps.size > 0
@@ -723,6 +724,11 @@ function ClusterVMsTab({
       const sid = inst.servers?.[0]
       const host = sid ? (hostMap.get(sid) ?? '') : ''
       return host.toLowerCase().includes(filterHost.toLowerCase())
+    })
+    .filter((inst) => {
+      if (!filterCdrom) return true
+      const hasCdrom = !!(inst.config?.imageId)
+      return filterCdrom === 'mounted' ? hasCdrom : !hasCdrom
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -921,7 +927,7 @@ function ClusterVMsTab({
             <p className="text-xs mt-0.5" style={{ color: '#566278' }}>
               {selected.size > 0
                 ? `${selected.size} of ${vms.length} selected`
-                : (filterName || filterStatus || filterHost)
+                : (filterName || filterStatus || filterHost || filterCdrom)
                   ? `${vms.length} of ${(instData?.instances ?? []).filter(i => !clusterZoneId || i.cloud?.id === clusterZoneId).length} VM${vms.length !== 1 ? 's' : ''}`
                   : `${vms.length} VM${vms.length !== 1 ? 's' : ''} in cluster`}
             </p>
@@ -1041,6 +1047,7 @@ function ClusterVMsTab({
                 <th>Placement Strategy</th>
                 <th>IP Address</th>
                 <th>Plan</th>
+                <th style={{ width: 72 }}>CD-ROM</th>
               </tr>
               <tr>
                 <th />
@@ -1081,6 +1088,20 @@ function ClusterVMsTab({
                   />
                 </th>
                 <th /><th /><th />
+                <th>
+                  <select
+                    value={filterCdrom}
+                    onChange={e => setFilterCdrom(e.target.value as '' | 'mounted' | 'none')}
+                    style={{
+                      width: '100%', background: '#0D1117', border: '1px solid #1E2A45',
+                      borderRadius: 4, padding: '2px 4px', color: '#C8D6E5', fontSize: 11, outline: 'none',
+                    }}
+                  >
+                    <option value="">All</option>
+                    <option value="mounted">Mounted</option>
+                    <option value="none">None</option>
+                  </select>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1094,6 +1115,7 @@ function ClusterVMsTab({
                 const isPowerOp = powerOps.has(inst.id)
                 const isBusy = isMoving || isPowerOp
                 const instStatus = inst.status.toLowerCase()
+                const hasCdrom = !!(inst.config?.imageId)
 
                 return (
                   <tr key={inst.id} className={clsx(isBusy && 'opacity-60')}>
@@ -1148,6 +1170,20 @@ function ClusterVMsTab({
                       <span className="font-mono text-xs" style={{ color: '#8B9AB0' }}>{ip ?? '—'}</span>
                     </td>
                     <td style={{ color: '#8B9AB0' }}>{inst.plan?.name ?? '—'}</td>
+                    <td>
+                      {hasCdrom ? (
+                        <span
+                          className="flex items-center gap-1 text-2xs"
+                          style={{ color: '#60A5FA' }}
+                          title={String(inst.config?.imageId)}
+                        >
+                          <Disc size={11} />
+                          Mounted
+                        </span>
+                      ) : (
+                        <span style={{ color: '#566278' }}>—</span>
+                      )}
+                    </td>
                   </tr>
                 )
               })}

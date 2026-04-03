@@ -297,6 +297,12 @@ export interface Instance {
   powerState?: string
   notes?: string
   userStatus?: string
+  // CD-ROM / ISO mount state — populated when an ISO image is attached
+  config?: {
+    imageId?: string | number | null
+    imageCode?: string | null
+    imageType?: string | null
+  }
 }
 
 export interface InstancesResponse {
