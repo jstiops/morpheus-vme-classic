@@ -101,6 +101,11 @@ export async function suspendInstance(id: number) {
   return resp.data
 }
 
+export async function ejectInstance(id: number) {
+  const resp = await apiClient.put(`/api/instances/${id}/eject`)
+  return resp.data
+}
+
 // ─── Snapshot Actions ─────────────────────────────────────────────────────────
 
 export async function createSnapshot(

@@ -13,8 +13,10 @@ import {
   MoveRight,
   Loader2,
   CheckCircle2,
+  ChevronDown,
+  Disc,
 } from 'lucide-react'
-import { getInstance, startInstance, stopInstance, restartInstance } from '@/api/instances'
+import { getInstance, startInstance, stopInstance, restartInstance, ejectInstance } from '@/api/instances'
 import { consoleUrl } from '@/utils/vmeManagerUrl'
 import { getServer, listServers, moveServer } from '@/api/servers'
 import { StatusBadge } from '@/components/common/StatusDot'
@@ -53,6 +55,13 @@ export function VMDetailPage() {
   const [targetHostId, setTargetHostId] = useState<number | null>(null)
   const [moveOp, setMoveOp] = useState<{ targetHostName: string; startedAt: number } | null>(null)
   const [moveJustDone, setMoveJustDone] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
+
+  const ejectMutation = useMutation({
+    mutationFn: () => ejectInstance(instanceId),
+    onSuccess: () => toast.success('CD-ROM ejected'),
+    onError: () => toast.error('Eject failed'),
+  })
 
   // Fetch the VM's own server record — has parentServer (= hypervisor) and interfaces (= networks)
   const vmServerId = instance?.servers?.[0]
@@ -249,6 +258,38 @@ export function VMDetailPage() {
             <MoveRight size={13} />
             Move
           </button>
+
+          {/* Actions dropdown */}
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            <button
+              className="btn btn-secondary py-1.5 px-3"
+              onClick={() => setActionsOpen(o => !o)}
+            >
+              Actions
+              <ChevronDown size={13} className={clsx('transition-transform', actionsOpen && 'rotate-180')} />
+            </button>
+            {actionsOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setActionsOpen(false)} />
+                <div
+                  className="absolute left-0 mt-1 rounded-lg py-1 z-50"
+                  style={{ background: '#141C2E', border: '1px solid #1E2A45', minWidth: 180, top: '100%' }}
+                >
+                  <button
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left"
+                    style={{ color: '#C8D6E5' }}
+                    disabled={ejectMutation.isPending}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#1E2A45')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    onClick={() => { setActionsOpen(false); ejectMutation.mutate() }}
+                  >
+                    <Disc size={13} style={{ color: '#8B9AB0' }} />
+                    {ejectMutation.isPending ? 'Ejecting…' : 'Eject CD-ROM'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <button
