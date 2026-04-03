@@ -24,13 +24,6 @@ export async function listInstances(
   const resp = await apiClient.get<InstancesResponse>('/api/instances', {
     params: { max: 100, ...params },
   })
-  // DEBUG: temporary — log first instance to discover CD-ROM/ISO field names
-  if (resp.data.instances.length > 0) {
-    const raw = resp.data.instances[0] as unknown as Record<string, unknown>
-    console.log('[DEBUG] instance[0] keys:', Object.keys(raw))
-    console.log('[DEBUG] instance[0].config:', raw['config'])
-    console.log('[DEBUG] instance[0] full:', JSON.stringify(raw))
-  }
   return resp.data
 }
 

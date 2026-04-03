@@ -267,6 +267,23 @@ export interface ContainerStats {
   ts?: string
 }
 
+export interface InstanceVolume {
+  id: number
+  uuid?: string
+  name: string
+  shortName?: string
+  rootVolume: boolean
+  size: number
+  storageType?: number
+  volumeCategory?: string
+  controllerId?: number
+  datastoreId?: number | null
+  displayOrder?: number
+  resizeable?: boolean
+  unitNumber?: string | null
+  controllerMountPoint?: string
+}
+
 export interface Instance {
   id: number
   name: string
@@ -281,6 +298,7 @@ export interface Instance {
   layout?: { id: number; name: string }
   containers: Container[]
   servers?: number[]
+  volumes?: InstanceVolume[]
   connectionInfo?: { ip?: string; port?: number }[]
   ip?: string
   hostName?: string
@@ -297,12 +315,6 @@ export interface Instance {
   powerState?: string
   notes?: string
   userStatus?: string
-  // CD-ROM / ISO mount state — populated when an ISO image is attached
-  config?: {
-    imageId?: string | number | null
-    imageCode?: string | null
-    imageType?: string | null
-  }
 }
 
 export interface InstancesResponse {

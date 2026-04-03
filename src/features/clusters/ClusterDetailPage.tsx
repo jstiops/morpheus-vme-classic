@@ -727,7 +727,7 @@ function ClusterVMsTab({
     })
     .filter((inst) => {
       if (!filterCdrom) return true
-      const hasCdrom = !!(inst.config?.imageId)
+      const hasCdrom = !!(inst.volumes?.some((v) => v.volumeCategory === 'cd'))
       return filterCdrom === 'mounted' ? hasCdrom : !hasCdrom
     })
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -1115,7 +1115,7 @@ function ClusterVMsTab({
                 const isPowerOp = powerOps.has(inst.id)
                 const isBusy = isMoving || isPowerOp
                 const instStatus = inst.status.toLowerCase()
-                const hasCdrom = !!(inst.config?.imageId)
+                const hasCdrom = !!(inst.volumes?.some((v) => v.volumeCategory === 'cd'))
 
                 return (
                   <tr key={inst.id} className={clsx(isBusy && 'opacity-60')}>
@@ -1175,7 +1175,7 @@ function ClusterVMsTab({
                         <span
                           className="flex items-center gap-1 text-2xs"
                           style={{ color: '#60A5FA' }}
-                          title={String(inst.config?.imageId)}
+                          title={inst.volumes?.find((v) => v.volumeCategory === 'cd')?.name ?? 'CD-ROM'}
                         >
                           <Disc size={11} />
                           Mounted
