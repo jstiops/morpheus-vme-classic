@@ -113,18 +113,27 @@ export async function mountIso(
   cdromVolumeId: number,
   isoImageId: number,
 ) {
-  // Resize endpoint accepts all current volumes; only the CD-ROM entry
-  // gets virtualImageId set — everything else is passed through unchanged.
-  const resizeVolumes = volumes.map((v) => ({
-    id: v.id,
-    name: v.name,
-    size: v.size,
-    storageType: v.storageType,
-    controllerMountPoint: v.controllerMountPoint,
-    datastoreId: v.datastoreId ?? 'auto',
-    rootVolume: v.rootVolume,
-    ...(v.id === cdromVolumeId ? { virtualImageId: isoImageId } : {}),
-  }))
+  // The resize endpoint treats the volumes array as the full desired state,
+  // so we must include every volume — not just the CD-ROM one.
+  // We pass back only the fields Morpheus needs to identify each volume and
+  // leave its configuration unchanged. The only mutation is adding
+  // virtualImageId to the CD-ROM entry.
+  const resizeVolumes = volumes.map((v) => {
+    const base: Record<string, unknown> = {
+      id: v.id,
+      name: v.name,
+      size: v.size,
+      storageType: v.storageType,
+      rootVolume: v.rootVolume,
+      controllerMountPoint: v.controllerMountPoint,
+    }
+    // Only set datastoreId when it is known — avoid sending 'auto' for
+    // volumes that already have a datastore assigned (could trigger a move).
+    if (v.datastoreId != null) base.datastoreId = v.datastoreId
+    // Mount the selected ISO on the CD-ROM volume.
+    if (v.id === cdromVolumeId) base.virtualImageId = isoImageId
+    return base
+  })
   const resp = await apiClient.put(`/api/instances/${instanceId}/resize`, {
     volumes: resizeVolumes,
   })
