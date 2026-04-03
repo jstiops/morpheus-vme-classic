@@ -657,7 +657,7 @@ function ClusterVMsTab({
   const [filterName, setFilterName] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [filterHost, setFilterHost] = useState('')
-  const [filterCdrom, setFilterCdrom] = useState<'' | 'mounted' | 'none'>('')
+  const [filterCdrom, setFilterCdrom] = useState('')
 
   // ── Instance list ──────────────────────────────────────────────────────────
   const busy = moveOps.length > 0 || powerOps.size > 0
@@ -727,8 +727,8 @@ function ClusterVMsTab({
     })
     .filter((inst) => {
       if (!filterCdrom) return true
-      const hasCdrom = !!(inst.volumes?.some((v) => v.volumeCategory === 'cd' && (v.size > 0 || v.datastoreId != null)))
-      return filterCdrom === 'mounted' ? hasCdrom : !hasCdrom
+      const label = inst.volumes?.some((v) => v.volumeCategory === 'cd' && (v.size > 0 || v.datastoreId != null)) ? 'mounted' : '—'
+      return label.toLowerCase().includes(filterCdrom.toLowerCase())
     })
     .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -1045,7 +1045,6 @@ function ClusterVMsTab({
                 <th>Status</th>
                 <th>Host</th>
                 <th>Placement Strategy</th>
-                <th>IP Address</th>
                 <th>Plan</th>
                 <th style={{ width: 72 }}>CD-ROM</th>
               </tr>
@@ -1087,26 +1086,23 @@ function ClusterVMsTab({
                     }}
                   />
                 </th>
-                <th /><th /><th />
+                <th /><th />
                 <th>
-                  <select
+                  <input
+                    type="text"
+                    placeholder="Filter…"
                     value={filterCdrom}
-                    onChange={e => setFilterCdrom(e.target.value as '' | 'mounted' | 'none')}
+                    onChange={e => setFilterCdrom(e.target.value)}
                     style={{
                       width: '100%', background: '#0D1117', border: '1px solid #1E2A45',
-                      borderRadius: 4, padding: '2px 4px', color: '#C8D6E5', fontSize: 11, outline: 'none',
+                      borderRadius: 4, padding: '2px 6px', color: '#C8D6E5', fontSize: 11, outline: 'none',
                     }}
-                  >
-                    <option value="">All</option>
-                    <option value="mounted">Mounted</option>
-                    <option value="none">None</option>
-                  </select>
+                  />
                 </th>
               </tr>
             </thead>
             <tbody>
               {vms.map((inst) => {
-                const ip = inst.connectionInfo?.[0]?.ip ?? inst.containers?.[0]?.ip ?? inst.containers?.[0]?.internalIp
                 const sid = vmServerIdMap.get(inst.id)
                 const hostName = sid ? (hostMap.get(sid) ?? '—') : '—'
                 const strategy = sid ? (placementStrategyMap.get(sid) ?? null) : null
@@ -1166,10 +1162,7 @@ function ClusterVMsTab({
                         <span style={{ color: '#566278' }}>—</span>
                       )}
                     </td>
-                    <td>
-                      <span className="font-mono text-xs" style={{ color: '#8B9AB0' }}>{ip ?? '—'}</span>
-                    </td>
-                    <td style={{ color: '#8B9AB0' }}>{inst.plan?.name ?? '—'}</td>
+                    <td style={{ color: '#8B9AB0', whiteSpace: 'nowrap' }}>{inst.plan?.name ?? '—'}</td>
                     <td>
                       {hasCdrom ? (
                         <span
