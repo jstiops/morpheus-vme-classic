@@ -36,6 +36,55 @@ for managing HPE Morpheus VM Essentials environments — without learning a new 
 
 ---
 
+## Screenshots
+
+![Dashboard](docs/screenshots/02-dashboard.png)
+
+<details>
+<summary><b>Sign in</b></summary>
+
+![Sign-in page](docs/screenshots/01-login.png)
+</details>
+
+<details>
+<summary><b>Virtual machines</b>: list, summary, snapshots, tasks &amp; events</summary>
+
+![VM list](docs/screenshots/03-vms.png)
+![VM summary tab](docs/screenshots/04-vm-summary.png)
+![VM snapshots tab](docs/screenshots/05-vm-snapshots.png)
+![VM tasks and events tab](docs/screenshots/06-vm-tasks.png)
+</details>
+
+<details>
+<summary><b>Hosts</b>: list and detail</summary>
+
+![Host list](docs/screenshots/07-hosts.png)
+![Host detail](docs/screenshots/08-host-detail.png)
+</details>
+
+<details>
+<summary><b>Clusters</b>: list and detail</summary>
+
+![Cluster list](docs/screenshots/09-clusters.png)
+![Cluster detail](docs/screenshots/10-cluster-detail.png)
+</details>
+
+<details>
+<summary><b>Networks</b>: list and detail</summary>
+
+![Network list](docs/screenshots/11-networks.png)
+![Network detail](docs/screenshots/12-network-detail.png)
+</details>
+
+<details>
+<summary><b>Storage</b>: datastore list and detail</summary>
+
+![Datastore list](docs/screenshots/13-storage.png)
+![Datastore detail](docs/screenshots/14-storage-detail.png)
+</details>
+
+---
+
 ## Tech Stack
 
 | Layer | Choice | Rationale |
@@ -67,7 +116,7 @@ sudo bash deploy.sh
 
 **`deploy.sh` will:**
 
-1. Install Node.js 20 LTS (via NodeSource), Nginx, and OpenSSL if not already present
+1. Install Node.js 20 LTS (via NodeSource), Nginx, OpenSSL, git, and rsync if not already present
 2. Prompt once for your VME Manager URL (e.g. `https://morpheus.example.com`)
 3. Generate a self-signed TLS certificate (RSA 2048, 10-year validity) stored at `/etc/ssl/morpheus-vme/`
 4. Run `npm ci && npm run build` to produce the static bundle

@@ -77,6 +77,14 @@ if [[ "$UPDATE_MODE" == true ]]; then
     fi
     print_ok "VME URL: $VME_URL"
 
+    # Older installs may predate rsync being a checked prerequisite
+    if ! command -v rsync &>/dev/null; then
+        print_step "Installing rsync"
+        apt-get update -qq
+        apt-get install -y -qq rsync
+        print_ok "rsync installed"
+    fi
+
     print_step "Pulling latest source"
     git -C "$APP_DIR" pull --ff-only
     print_ok "Source updated"
@@ -166,6 +174,13 @@ if ! command -v git &>/dev/null; then
     print_ok "git installed"
 else
     print_ok "git already installed"
+fi
+
+if ! command -v rsync &>/dev/null; then
+    apt-get install -y -qq rsync
+    print_ok "rsync installed"
+else
+    print_ok "rsync already installed"
 fi
 
 if ! command -v ufw &>/dev/null; then
